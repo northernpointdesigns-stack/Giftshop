@@ -892,6 +892,21 @@ class DatabaseService {
       }
     });
 
+    // 1b. Credit/reverse consignment vendor owed balances
+    newTx.items.forEach((item) => {
+      if (!item.isConsignment || !item.vendorId) return;
+      const vendor = this.getVendorById(item.vendorId);
+      if (!vendor) return;
+      const lineTotal = item.finalPrice * item.quantity;
+      const vendorShare = lineTotal * (1 - vendor.commissionRate / 100);
+      if (newTx.isRefund) {
+        vendor.totalOwed = Math.max(0, (vendor.totalOwed || 0) - Math.abs(vendorShare));
+      } else {
+        vendor.totalOwed = (vendor.totalOwed || 0) + vendorShare;
+      }
+    });
+    this.saveVendors();
+
     // 2. Update Customer Profile & Loyalty
     if (newTx.customerId) {
       const cust = this.getCustomerById(newTx.customerId);
@@ -1005,6 +1020,21 @@ class DatabaseService {
         this.adjustStock(item.itemId, Math.abs(item.quantity));
       }
     });
+
+    // 2b. Reverse consignment vendor owed balances
+    tx.items.forEach((item) => {
+      if (!item.isConsignment || !item.vendorId) return;
+      const vendor = this.getVendorById(item.vendorId);
+      if (!vendor) return;
+      const lineTotal = item.finalPrice * item.quantity;
+      const vendorShare = lineTotal * (1 - vendor.commissionRate / 100);
+      if (tx.isRefund) {
+        vendor.totalOwed = (vendor.totalOwed || 0) + Math.abs(vendorShare);
+      } else {
+        vendor.totalOwed = Math.max(0, (vendor.totalOwed || 0) - vendorShare);
+      }
+    });
+    this.saveVendors();
 
     // 3. Reverse customer loyalty points earned
     if (tx.customerId && tx.loyaltyPointsEarned && tx.loyaltyPointsEarned > 0) {
