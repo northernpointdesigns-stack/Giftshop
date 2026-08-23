@@ -46,56 +46,6 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({ onRefresh }) => {
     }
   };
 
-  // If not authorized yet, show the secure authentication screen
-  if (!isAuthorized) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center bg-[#0B0D13] p-4">
-        <form
-          onSubmit={handleAdminLogin}
-          className="bg-[#161B22] border border-[#1E293B] p-8 rounded-2xl max-w-md w-full space-y-6 shadow-2xl text-center"
-        >
-          <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto text-emerald-400">
-            <Lock className="w-7 h-7" />
-          </div>
-          
-          <div className="space-y-1.5">
-            <h2 className="text-lg font-black text-white tracking-tight">Manager Authentication</h2>
-            <p className="text-xs text-slate-400 px-2 leading-relaxed">
-              Store configuration, financial records, and core register parameters are restricted. Enter Manager or Supervisor PIN to continue.
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <input
-              type="password"
-              maxLength={8}
-              value={pinInput}
-              onChange={(e) => setPinInput(e.target.value)}
-              placeholder="Enter PIN Code..."
-              className="w-full bg-[#0F1115] border border-[#1E293B] focus:border-emerald-500 text-center text-xl font-mono tracking-widest text-white rounded-xl py-3 focus:outline-none focus:ring-1 focus:ring-emerald-500/30"
-              autoFocus
-            />
-            {pinError && (
-              <p className="text-xs text-rose-400 font-bold bg-rose-500/10 py-1.5 px-3 rounded-lg border border-rose-500/20">
-                {pinError}
-              </p>
-            )}
-            <p className="text-[10px] text-slate-500 italic">
-              Default: admin123 or Clara (2244)
-            </p>
-          </div>
-
-          <button
-            type="submit"
-            className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-98 text-white font-black text-xs transition-all shadow-lg shadow-emerald-950/45 cursor-pointer"
-          >
-            Unlock Store Settings
-          </button>
-        </form>
-      </div>
-    );
-  }
-
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-[#0B0D13] p-4 sm:p-6 overflow-y-auto">
       <div className="max-w-4xl mx-auto w-full space-y-6">

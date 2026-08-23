@@ -25,11 +25,11 @@ function createMainWindow() {
     },
   });
 
-  const appURL = isDev
-    ? 'http://localhost:3000'
-    : `file://${path.join(__dirname, '../dist/index.html')}`;
-
-  mainWindow.loadURL(appURL);
+  if (isDev) {
+    mainWindow.loadURL('http://localhost:3000');
+  } else {
+    mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+  }
 
   mainWindow.on('closed', () => {
     mainWindow = null;
@@ -72,11 +72,13 @@ function createCustomerFacingWindow() {
     },
   });
 
-  const customerURL = isDev
-    ? 'http://localhost:3000/?tab=customer_display'
-    : `file://${path.join(__dirname, '../dist/index.html')}?tab=customer_display`;
-
-  customerWindow.loadURL(customerURL);
+  if (isDev) {
+    customerWindow.loadURL('http://localhost:3000/?tab=customer_display');
+  } else {
+    customerWindow.loadFile(path.join(__dirname, '../dist/index.html'), {
+      search: 'tab=customer_display'
+    });
+  }
 
   customerWindow.on('closed', () => {
     customerWindow = null;
