@@ -28,7 +28,8 @@ export const CustomerDisplay: React.FC = () => {
   }, []);
 
   const handleOpenDualWindow = () => {
-    window.open('/customer-display', '_blank', 'width=1024,height=768');
+    const url = `${window.location.pathname}?tab=customer_display`;
+    window.open(url, '_blank', 'width=1024,height=768');
   };
 
   return (
