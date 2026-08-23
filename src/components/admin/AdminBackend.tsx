@@ -26,33 +26,6 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({ onRefresh }) => {
   const [isSqlModalOpen, setIsSqlModalOpen] = useState(false);
   const [savedToast, setSavedToast] = useState(false);
 
-  // Administrative Authorization Pin Gate
-  const [isAuthorized, setIsAuthorized] = useState(false);
-  const [pinInput, setPinInput] = useState('');
-  const [pinError, setPinError] = useState('');
-
-  const handleAdminLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    setPinError('');
-
-    const staffUsers = posDb.getActiveCashiers();
-    const isMasterPin = pinInput === (settings.adminPin || 'admin123');
-    
-    // Check if the pin matches the master admin pin or any administrative staff member (admin or supervisor)
-    const matchedStaff = staffUsers.find(
-      (staff) => staff.pin === pinInput && (staff.role === 'admin' || staff.role === 'supervisor')
-    );
-
-    if (isMasterPin || matchedStaff) {
-      setIsAuthorized(true);
-      setPinInput('');
-      soundService.playSuccessChime();
-    } else {
-      setPinError('Access Denied. Invalid Administrator or Supervisor PIN.');
-      soundService.playErrorBeep();
-    }
-  };
-
   const handleSaveSettings = (e: React.FormEvent) => {
     e.preventDefault();
     posDb.saveSettings(settings);
