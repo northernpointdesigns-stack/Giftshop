@@ -199,7 +199,7 @@ export const CustomerDisplay: React.FC<CustomerDisplayProps> = ({
               <div className="flex justify-between">
                 <span>Net Subtotal</span>
                <span className="font-mono font-bold text-[#E2E8F0]">
-                   {displaySymbol} {displaySubtotal.toFixed(2)} {displayCode}
+                   {displaySubtotal.toFixed(2)} <span className="text-[10px] text-slate-400 font-semibold">{displayCode}</span>
                 </span>
               </div>
               <div className="flex justify-between text-cyan-400">
@@ -207,7 +207,7 @@ export const CustomerDisplay: React.FC<CustomerDisplayProps> = ({
                   <Percent className="w-3.5 h-3.5" /> VAT Tax ({currentVatRateText})
                 </span>
                 <span className="font-mono font-bold">
-                   +{displaySymbol} {displayTax.toFixed(2)} {displayCode}
+                   +{displayTax.toFixed(2)} <span className="text-[10px] text-cyan-400/70 font-semibold">{displayCode}</span>
                 </span>
               </div>
             </div>
@@ -217,7 +217,8 @@ export const CustomerDisplay: React.FC<CustomerDisplayProps> = ({
                 TOTAL DUE
               </div>
               <div className="text-4xl lg:text-5xl font-black font-mono text-emerald-400 my-1">
-                 {displaySymbol} {displayTotal.toFixed(2)} {displayCode}
+                {displayTotal.toFixed(2)}
+                <span className="text-base lg:text-lg font-bold text-emerald-500/80 ml-2">{displayCode}</span>
               </div>
 
               {/* Multi-currency reference amounts for the customer */}

@@ -230,10 +230,11 @@ export default function App() {
           <InvoiceManager onRefreshData={refreshData} />
         )}
 
-        {/* TAB 5: Reports (EOD Balancing & Financial P&L) */}
+        {/* TAB 5: Reports — Cashiers see ONLY the EOD drawer area; admins see everything */}
         {activeTab === 'reports' && (isAdminLoggedIn || cashierAccess.reports) && (
           <div className="space-y-4">
-            {/* Sub-tab Switcher */}
+            {/* Sub-tab Switcher (admin only — separated from cashier view) */}
+            {isAdminLoggedIn && (
             <div className="flex bg-[#161B22] p-1.5 rounded-xl border border-[#1E293B] max-w-2xl flex-wrap gap-1 sm:gap-0">
               <button
                 onClick={() => setReportsSubTab('eod')}
@@ -266,8 +267,9 @@ export default function App() {
                 Sales Forecasting
               </button>
             </div>
+            )}
 
-            {reportsSubTab === 'eod' ? (
+            {(!isAdminLoggedIn || reportsSubTab === 'eod') ? (
               <EODBalancing onRefreshData={refreshData} />
             ) : reportsSubTab === 'pnl' ? (
               <FinancialReports

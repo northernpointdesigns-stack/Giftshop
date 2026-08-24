@@ -266,6 +266,46 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
     }
   };
 
+  // Instant-apply a settings patch: saves immediately so controls feel
+  // responsive (no hidden "Save" click required)
+  const applySettingInstant = (patch: Partial<StoreSettings>) => {
+    setSettings({ ...settings, ...patch });
+    posDb.updateSettings(patch);
+    onRefreshData();
+  };
+
+  // Upload a shop logo file and store it as a small data URL so it works
+  // offline (a local file path like /Users/... will NOT render in the app)
+  const handleLogoFile = (file?: File | null) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      alert('Please choose an image file (PNG/SVG/JPG).');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result);
+      if (file.type === 'image/svg+xml') {
+        applySettingInstant({ brandLogoUrl: result });
+        return;
+      }
+      const img = new window.Image();
+      img.onload = () => {
+        const maxDim = 200;
+        const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(img.width * scale));
+        canvas.height = Math.max(1, Math.round(img.height * scale));
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        applySettingInstant({ brandLogoUrl: canvas.toDataURL('image/png') });
+      };
+      img.src = result;
+    };
+    reader.readAsDataURL(file);
+  };
+
   // Manual full-data backup download
   const handleManualBackup = () => {
     const blob = new Blob([posDb.exportBackup()], { type: 'application/json' });
@@ -1884,17 +1924,17 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
                         type="checkbox"
                         checked={settings.cashierAccess?.[area] ?? (area === 'pos')}
                         disabled={locked}
-                        onChange={(e) => setSettings({
-                          ...settings,
-                          cashierAccess: {
+                        onChange={(e) => {
+                          const nextAccess = {
                             pos: settings.cashierAccess?.pos ?? true,
                             inventory: settings.cashierAccess?.inventory ?? true,
                             reports: settings.cashierAccess?.reports ?? true,
                             settings: settings.cashierAccess?.settings ?? false,
                             staff: settings.cashierAccess?.staff ?? false,
                             [area]: e.target.checked,
-                          },
-                        })}
+                          };
+                          applySettingInstant({ cashierAccess: nextAccess });
+                        }}
                         className="rounded text-emerald-600 focus:ring-emerald-500 focus:ring-offset-slate-900 h-4 w-4"
                       />
                       <span className={locked ? 'text-slate-500' : ''}>{label}</span>
@@ -1917,7 +1957,7 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
                     type="checkbox"
                     id="removeIslandBranding"
                     checked={settings.removeIslandBranding || false}
-                    onChange={(e) => setSettings({ ...settings, removeIslandBranding: e.target.checked })}
+                    onChange={(e) => applySettingInstant({ removeIslandBranding: e.target.checked })}
                     className="rounded text-emerald-600 focus:ring-emerald-500 focus:ring-offset-slate-900 h-4.5 w-4.5 mt-0.5"
                   />
                   <div>
@@ -1939,7 +1979,7 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
                       type="text"
                       placeholder="e.g. My Boutique POS"
                       value={settings.posAppName || ''}
-                      onChange={(e) => setSettings({ ...settings, posAppName: e.target.value })}
+                      onChange={(e) => applySettingInstant({ posAppName: e.target.value })}
                       className="w-full bg-[#161B22] border border-[#1E293B] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 font-semibold"
                     />
                   </div>
@@ -1953,7 +1993,7 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
                       placeholder="e.g. MBP"
                       maxLength={4}
                       value={settings.posShortName || ''}
-                      onChange={(e) => setSettings({ ...settings, posShortName: e.target.value })}
+                      onChange={(e) => applySettingInstant({ posShortName: e.target.value })}
                       className="w-full bg-[#161B22] border border-[#1E293B] rounded-xl px-3 py-2 text-xs text-white text-center focus:outline-none focus:border-emerald-500 font-mono font-black"
                     />
                   </div>
@@ -1966,7 +2006,7 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
                       type="text"
                       placeholder="e.g. v2.4.1"
                       value={settings.posVersion || ''}
-                      onChange={(e) => setSettings({ ...settings, posVersion: e.target.value })}
+                      onChange={(e) => applySettingInstant({ posVersion: e.target.value })}
                       className="w-full bg-[#161B22] border border-[#1E293B] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
                     />
                   </div>
@@ -2000,13 +2040,49 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
 
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-300 mb-1">
-                    Custom Logo URL (Replaces Badge if specified):
+                    Shop Logo (upload from your computer — recommended):
+                  </label>
+                  <div className="flex items-center gap-3">
+                    {settings.brandLogoUrl ? (
+                      <img src={settings.brandLogoUrl} alt="Logo preview" className="w-12 h-12 rounded-lg object-contain bg-[#0F1115] border border-[#1E293B] p-1" />
+                    ) : (
+                      <div className="w-12 h-12 rounded-lg bg-[#0F1115] border border-dashed border-slate-700 flex items-center justify-center text-[9px] text-slate-500 text-center">No logo</div>
+                    )}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-colors w-fit">
+                        Choose Logo File…
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            handleLogoFile(e.target.files?.[0]);
+                            e.currentTarget.value = '';
+                          }}
+                        />
+                      </label>
+                      {settings.brandLogoUrl && (
+                        <button
+                          type="button"
+                          onClick={() => applySettingInstant({ brandLogoUrl: '' })}
+                          className="text-rose-400 hover:text-rose-300 text-xs font-semibold w-fit"
+                        >
+                          Remove logo
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                    Or Logo Image URL (advanced — must be a web link, local file paths will not display):
                   </label>
                   <input
                     type="text"
                     placeholder="https://example.com/logo.png (Transparent background SVG/PNG recommended)"
                     value={settings.brandLogoUrl || ''}
-                    onChange={(e) => setSettings({ ...settings, brandLogoUrl: e.target.value })}
+                    onChange={(e) => applySettingInstant({ brandLogoUrl: e.target.value })}
                     className="w-full bg-[#161B22] border border-[#1E293B] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
                   />
                 </div>
