@@ -1,0 +1,6 @@
+{
+  "version": "v2.5.0",
+  "releaseNotes": "A critical performance and security release. Includes: \n- Core processing optimization for multiple register lines.\n- Seamless multi-currency checkout calculation.\n- Full support for whitelabeled custom business branding, tailored layout themes, and dynamic custom tab label setups.\n- Offline Windows installer packaging (.exe) structures.",
+  "downloadUrl": "https://ais-dev-nmzoayv6fwoxbvqjz57bye-355163755256.europe-west2.run.app/download/BoutiquePOS.AppImage",
+  "releaseDate": "2026-08-22"
+}
