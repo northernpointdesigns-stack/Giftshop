@@ -11,6 +11,8 @@ import {
   CashDrawerLog,
   CashDrawerEventType,
   Customer,
+  VendorAdvance,
+  Invoice,
 } from '../types/pos';
 import { ParsedCsvRow } from './csvParser';
 
@@ -25,108 +27,18 @@ const STORAGE_KEYS = {
   CATEGORIES: 'island_pos_categories_v2',
   DRAWER_LOGS: 'island_pos_drawer_logs_v2',
   CUSTOMERS: 'island_pos_customers_v2',
+  ADVANCES: 'island_pos_advances_v2',
+  INVOICES: 'island_pos_invoices_v2',
 };
 
-const DEFAULT_CUSTOMERS: Customer[] = [
-  {
-    id: 'CUST-1001',
-    name: 'Annette Dupuis',
-    phone: '+248 2 514 820',
-    email: 'annette.dupuis@seychelles.sc',
-    membershipTier: 'VIP',
-    loyaltyPoints: 480,
-    notes: 'Regular customer for artisan soaps & Ocean T-shirts. Prefers digital receipts.',
-    registeredAt: new Date(Date.now() - 60 * 86400000).toISOString(),
-  },
-  {
-    id: 'CUST-1002',
-    name: 'Jean-Luc Barbier',
-    phone: '+248 2 710 334',
-    email: 'jl.barbier@granite-island.sc',
-    membershipTier: 'Gold',
-    loyaltyPoints: 310,
-    notes: 'Collects Ocean Seychelles mugs & handmade coconut crafts.',
-    registeredAt: new Date(Date.now() - 45 * 86400000).toISOString(),
-  },
-  {
-    id: 'CUST-1003',
-    name: 'Sarah Jenkins',
-    phone: '+44 7700 900123',
-    email: 'sarah.j.travels@outlook.com',
-    membershipTier: 'Silver',
-    loyaltyPoints: 165,
-    notes: 'Tourist from UK. Purchased souvenir t-shirts & pareos for family.',
-    registeredAt: new Date(Date.now() - 15 * 86400000).toISOString(),
-  },
-  {
-    id: 'CUST-1004',
-    name: 'Marcelle Roy',
-    phone: '+248 2 888 102',
-    email: 'marcelle.roy@seychelles.net',
-    membershipTier: 'Bronze',
-    loyaltyPoints: 85,
-    notes: 'Boutique neighbor on Promenade.',
-    registeredAt: new Date(Date.now() - 10 * 86400000).toISOString(),
-  },
-  {
-    id: 'CUST-1005',
-    name: 'Davide Rossi',
-    phone: '+39 347 555 0192',
-    email: 'davide.rossi@milano.it',
-    membershipTier: 'Bronze',
-    loyaltyPoints: 50,
-    notes: 'Resort guest, bought Pareo & Souvenir Bag.',
-    registeredAt: new Date(Date.now() - 2 * 86400000).toISOString(),
-  },
-];
+const DEFAULT_CUSTOMERS: Customer[] = [];
 
-const DEFAULT_DRAWER_LOGS: CashDrawerLog[] = [
-  {
-    id: 'LOG-SEED-01',
-    sessionId: 'EOD-001',
-    timestamp: new Date(Date.now() - 6 * 3600 * 1000).toISOString(),
-    eventType: 'open',
-    amount: 200.00,
-    staffName: 'Jane Doe',
-    reason: 'Morning shift opening float initialized',
-    currentFloatAfter: 200.00,
-  },
-  {
-    id: 'LOG-SEED-02',
-    sessionId: 'EOD-001',
-    timestamp: new Date(Date.now() - 4 * 3600 * 1000).toISOString(),
-    eventType: 'paid_in',
-    amount: 50.00,
-    staffName: 'Jane Doe',
-    reason: 'Added $50 petty cash change float top-up',
-    currentFloatAfter: 250.00,
-  },
-  {
-    id: 'LOG-SEED-03',
-    sessionId: 'EOD-001',
-    timestamp: new Date(Date.now() - 3 * 3600 * 1000).toISOString(),
-    eventType: 'manual_open',
-    amount: 0,
-    staffName: 'Marc Antoine',
-    reason: 'Opened cash drawer for customer receipt re-print check',
-    currentFloatAfter: 250.00,
-  },
-  {
-    id: 'LOG-SEED-04',
-    sessionId: 'EOD-001',
-    timestamp: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-    eventType: 'cash_drop',
-    amount: 100.00,
-    staffName: 'Jane Doe',
-    reason: 'Mid-day safe cash drop for security',
-    currentFloatAfter: 150.00,
-  },
-];
+const DEFAULT_DRAWER_LOGS: CashDrawerLog[] = [];
 
 const DEFAULT_SETTINGS: StoreSettings = {
   defaultVatRate: 0.15, // 15% Seychelles VAT
-  storeName: 'Seychelles Island Boutique',
-  taxRegistrationNumber: 'VAT-SEY-984210',
+  storeName: 'My Boutique',
+  taxRegistrationNumber: '',
   adminUsername: 'admin',
   adminPin: 'admin123',
   primaryCurrency: 'SCR',
@@ -151,16 +63,16 @@ const DEFAULT_SETTINGS: StoreSettings = {
   enableAutoUpdateCheck: true,
   updateConfigUrl: '/version.json',
   receiptLogoUrl: '',
-  receiptHeaderSubtitle: 'Official Retailer • Ocean Seychelles & Artisan Goods',
+  receiptHeaderSubtitle: '',
   receiptHeaderLines: [
-    'Victoria Promenade, Mahé, Seychelles',
-    'Tel: +248 4 321 900 • Email: info@oceanseychelles.sc',
+    
+    
   ],
-  receiptFooterMessage: 'Thank you for visiting Seychelles Island Boutique!',
+  receiptFooterMessage: 'Thank you for your visit!',
   receiptFooterPolicy: 'Returns & exchanges accepted within 14 days with valid sales receipt.',
   receiptFooterLines: [
-    'Follow us on Instagram @oceanseychelles',
-    'www.oceanseychelles.sc',
+    
+    
   ],
 };
 
@@ -171,24 +83,6 @@ const DEFAULT_STAFF: StaffUser[] = [
     username: 'admin',
     pin: 'admin123',
     role: 'admin',
-    status: 'active',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'STAFF-01',
-    name: 'Jane Doe',
-    username: 'jane',
-    pin: '1234',
-    role: 'cashier',
-    status: 'active',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'STAFF-02',
-    name: 'Marc Antoine',
-    username: 'marc',
-    pin: '5678',
-    role: 'senior_cashier',
     status: 'active',
     createdAt: new Date().toISOString(),
   },
@@ -203,481 +97,13 @@ const DEFAULT_CATEGORIES: CategoryTab[] = [
   { id: 'CAT-6', name: 'Souvenirs & Crafts', displayOrder: 6, color: 'purple' },
 ];
 
-// Default Vendors including Ocean Seychelles and Souvenir Boutique
-const DEFAULT_VENDORS: Vendor[] = [
-  {
-    id: 'VEND-OCEAN',
-    name: 'Ocean Seychelles Products',
-    brandName: 'Ocean Seychelles',
-    contactName: 'Laurent Morel',
-    email: 'info@oceanseychelles.sc',
-    phone: '+248 4 321 900',
-    supplierType: 'wholesale',
-    payoutTerms: 'Net 30',
-    consignmentCutRate: 0,
-    notes: 'Official line of Ocean Seychelles T-shirts (9 designs across Kids, Adults, Women) and Luxury/Normal Ceramic Mugs.',
-    createdAt: new Date(Date.now() - 90 * 86400000).toISOString(),
-  },
-  {
-    id: 'VEND-BOUTIQUE',
-    name: 'Souvenir Boutique Direct',
-    brandName: 'Souvenir Boutique',
-    contactName: 'Chantal Duprès',
-    email: 'chantal@souvenirboutique.sc',
-    phone: '+248 4 888 120',
-    supplierType: 'wholesale',
-    payoutTerms: 'Net 15',
-    consignmentCutRate: 0,
-    notes: 'In-house Souvenir Boutique direct stock including tote bags, t-shirts, and local crafts.',
-    createdAt: new Date(Date.now() - 80 * 86400000).toISOString(),
-  },
-  {
-    id: 'VEND-001',
-    name: "Alan's Handcrafted Soap & Botanicals",
-    brandName: 'Island Botanicals',
-    contactName: 'Alan Miller',
-    email: 'alan@islandbotanicals.com',
-    phone: '(808) 555-0142',
-    supplierType: 'consignment',
-    payoutTerms: 'Bi-weekly',
-    consignmentCutRate: 0.30, // 30% House Cut (70% to Alan)
-    notes: 'Local artisan supplier of natural soaps, body scrubs, and botanical bath items.',
-    createdAt: new Date(Date.now() - 30 * 86400000).toISOString(),
-  },
-  {
-    id: 'VEND-003',
-    name: 'Bora Bora Silk Pareos',
-    brandName: 'Bora Silk',
-    contactName: 'Keanu Tane',
-    email: 'keanu@boraborasilk.com',
-    phone: '(808) 555-3390',
-    supplierType: 'consignment',
-    payoutTerms: 'Monthly',
-    consignmentCutRate: 0.35, // 35% House Cut
-    notes: 'Hand-dyed silk sarongs, pareos, and beach wraps.',
-    createdAt: new Date(Date.now() - 45 * 86400000).toISOString(),
-  },
-];
+// Default Vendors - created by the shop admin (no fake data)
+const DEFAULT_VENDORS: Vendor[] = [];
 
-// Pre-seeded inventory matching the user request
-const DEFAULT_INVENTORY: InventoryItem[] = [
-  // --- OCEAN SEYCHELLES PRODUCTS (9 T-Shirt Designs + Luxury & Normal Mugs) ---
-  {
-    id: 'OCEAN-TS-01',
-    name: "Ocean Seychelles T-Shirt - Turtle Cove (Adult M)",
-    brand: 'Ocean Seychelles',
-    category: 'T-Shirts',
-    productLine: 'Beach Heritage',
-    size: 'Adults - Medium',
-    variant: 'Turtle Cove Design #1',
-    sku: '893100101',
-    stockLevel: 28,
-    minStockThreshold: 5,
-    retailPrice: 25.00,
-    costBasis: 12.50,
-    vatRate: 0.15,
-    taxable: true,
-    vendorId: 'VEND-OCEAN',
-    imageUrl: 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=400&q=80',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'OCEAN-TS-02',
-    name: "Ocean Seychelles T-Shirt - Turtle Cove (Women S)",
-    brand: 'Ocean Seychelles',
-    category: 'T-Shirts',
-    productLine: 'Beach Heritage',
-    size: 'Women - Small',
-    variant: 'Turtle Cove Design #1',
-    sku: '893100102',
-    stockLevel: 18,
-    minStockThreshold: 5,
-    retailPrice: 25.00,
-    costBasis: 12.50,
-    vatRate: 0.15,
-    taxable: true,
-    vendorId: 'VEND-OCEAN',
-    imageUrl: 'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=400&q=80',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'OCEAN-TS-03',
-    name: "Ocean Seychelles T-Shirt - Turtle Cove (Kids L)",
-    brand: 'Ocean Seychelles',
-    category: 'T-Shirts',
-    productLine: 'Beach Heritage',
-    size: 'Kids - Large',
-    variant: 'Turtle Cove Design #1',
-    sku: '893100103',
-    stockLevel: 14,
-    minStockThreshold: 4,
-    retailPrice: 18.00,
-    costBasis: 9.00,
-    vatRate: 0.15,
-    taxable: true,
-    vendorId: 'VEND-OCEAN',
-    imageUrl: 'https://images.unsplash.com/photo-1519238263530-99bdd11df2ea?auto=format&fit=crop&w=400&q=80',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'OCEAN-TS-04',
-    name: "Ocean Seychelles T-Shirt - Anse Source d'Argent (Adult L)",
-    brand: 'Ocean Seychelles',
-    category: 'T-Shirts',
-    productLine: 'Island Paradise',
-    size: 'Adults - Large',
-    variant: "Anse Source d'Argent Design #2",
-    sku: '893100104',
-    stockLevel: 22,
-    minStockThreshold: 6,
-    retailPrice: 28.00,
-    costBasis: 14.00,
-    vatRate: 0.15,
-    taxable: true,
-    vendorId: 'VEND-OCEAN',
-    imageUrl: 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=400&q=80',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'OCEAN-TS-05',
-    name: "Ocean Seychelles T-Shirt - Anse Source d'Argent (Women M)",
-    brand: 'Ocean Seychelles',
-    category: 'T-Shirts',
-    productLine: 'Island Paradise',
-    size: 'Women - Medium',
-    variant: "Anse Source d'Argent Design #2",
-    sku: '893100105',
-    stockLevel: 16,
-    minStockThreshold: 5,
-    retailPrice: 28.00,
-    costBasis: 14.00,
-    vatRate: 0.15,
-    taxable: true,
-    vendorId: 'VEND-OCEAN',
-    imageUrl: 'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=400&q=80',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'OCEAN-TS-06',
-    name: "Ocean Seychelles T-Shirt - Coco de Mer Heritage (Adult XL)",
-    brand: 'Ocean Seychelles',
-    category: 'T-Shirts',
-    productLine: 'Botanical Heritage',
-    size: 'Adults - XL',
-    variant: 'Coco de Mer Design #3',
-    sku: '893100106',
-    stockLevel: 10,
-    minStockThreshold: 4,
-    retailPrice: 30.00,
-    costBasis: 15.00,
-    vatRate: 0.15,
-    taxable: true,
-    vendorId: 'VEND-OCEAN',
-    imageUrl: 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=400&q=80',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'OCEAN-TS-07',
-    name: "Ocean Seychelles T-Shirt - Coco de Mer Heritage (Women S)",
-    brand: 'Ocean Seychelles',
-    category: 'T-Shirts',
-    productLine: 'Botanical Heritage',
-    size: 'Women - Small',
-    variant: 'Coco de Mer Design #3',
-    sku: '893100107',
-    stockLevel: 12,
-    minStockThreshold: 4,
-    retailPrice: 30.00,
-    costBasis: 15.00,
-    vatRate: 0.15,
-    taxable: true,
-    vendorId: 'VEND-OCEAN',
-    imageUrl: 'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=400&q=80',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'OCEAN-TS-08',
-    name: "Ocean Seychelles T-Shirt - Praslin Palms (Kids M)",
-    brand: 'Ocean Seychelles',
-    category: 'T-Shirts',
-    productLine: 'Sunset Collection',
-    size: 'Kids - Medium',
-    variant: 'Praslin Palms Design #4',
-    sku: '893100108',
-    stockLevel: 15,
-    minStockThreshold: 4,
-    retailPrice: 18.00,
-    costBasis: 9.00,
-    vatRate: 0.15,
-    taxable: true,
-    vendorId: 'VEND-OCEAN',
-    imageUrl: 'https://images.unsplash.com/photo-1519238263530-99bdd11df2ea?auto=format&fit=crop&w=400&q=80',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'OCEAN-TS-09',
-    name: "Ocean Seychelles T-Shirt - Mahé Coral Marine (Adult M)",
-    brand: 'Ocean Seychelles',
-    category: 'T-Shirts',
-    productLine: 'Marine Life',
-    size: 'Adults - Medium',
-    variant: 'Mahé Coral Design #5',
-    sku: '893100109',
-    stockLevel: 3, // Low stock alert
-    minStockThreshold: 8,
-    retailPrice: 26.00,
-    costBasis: 13.00,
-    vatRate: 0.15,
-    taxable: true,
-    vendorId: 'VEND-OCEAN',
-    imageUrl: 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=400&q=80',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'OCEAN-MUG-01',
-    name: "Ocean Seychelles Ceramic Mug - Luxury Gold Rim Line",
-    brand: 'Ocean Seychelles',
-    category: 'Mugs',
-    productLine: 'Luxury Line',
-    size: '12oz Gold Trim',
-    variant: 'Luxury Gold Edition',
-    sku: '893100201',
-    stockLevel: 24,
-    minStockThreshold: 6,
-    retailPrice: 18.00,
-    costBasis: 8.00,
-    vatRate: 0.15,
-    taxable: true,
-    vendorId: 'VEND-OCEAN',
-    imageUrl: 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&w=400&q=80',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'OCEAN-MUG-02',
-    name: "Ocean Seychelles Ceramic Mug - Normal Standard Line",
-    brand: 'Ocean Seychelles',
-    category: 'Mugs',
-    productLine: 'Normal Line',
-    size: '11oz Classic',
-    variant: 'Standard Matte Blue',
-    sku: '893100202',
-    stockLevel: 40,
-    minStockThreshold: 10,
-    retailPrice: 12.00,
-    costBasis: 5.00,
-    vatRate: 0.15,
-    taxable: true,
-    vendorId: 'VEND-OCEAN',
-    imageUrl: 'https://images.unsplash.com/photo-1577937927133-66ef06acdf18?auto=format&fit=crop&w=400&q=80',
-    createdAt: new Date().toISOString(),
-  },
-
-  // --- SOUVENIR BOUTIQUE DIRECT INVENTORY ---
-  {
-    id: 'BOUT-01',
-    name: 'Souvenir Boutique Canvas Tote Bag',
-    brand: 'Souvenir Boutique',
-    category: 'Bags',
-    productLine: 'Boutique Accessories',
-    size: 'One Size',
-    variant: 'Natural Cotton',
-    sku: '893200101',
-    stockLevel: 18,
-    minStockThreshold: 5,
-    retailPrice: 22.00,
-    costBasis: 10.00,
-    vatRate: 0.15,
-    taxable: true,
-    vendorId: 'VEND-BOUTIQUE',
-    imageUrl: 'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=400&q=80',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'BOUT-02',
-    name: 'Souvenir Boutique Woven Straw Beach Bag',
-    brand: 'Souvenir Boutique',
-    category: 'Bags',
-    productLine: 'Luxury Beachwear',
-    size: 'Large Tote',
-    variant: 'Woven Natural Straw',
-    sku: '893200102',
-    stockLevel: 12,
-    minStockThreshold: 4,
-    retailPrice: 34.00,
-    costBasis: 16.00,
-    vatRate: 0.15,
-    taxable: true,
-    vendorId: 'VEND-BOUTIQUE',
-    imageUrl: 'https://images.unsplash.com/photo-1590874103328-eac38a683ce7?auto=format&fit=crop&w=400&q=80',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'BOUT-03',
-    name: 'Souvenir Boutique Unisex Cotton T-Shirt',
-    brand: 'Souvenir Boutique',
-    category: 'T-Shirts',
-    productLine: 'Boutique Classics',
-    size: 'Adults - Large',
-    variant: 'Tropical Palm',
-    sku: '893200103',
-    stockLevel: 25,
-    minStockThreshold: 6,
-    retailPrice: 20.00,
-    costBasis: 10.00,
-    vatRate: 0.15,
-    taxable: true,
-    vendorId: 'VEND-BOUTIQUE',
-    imageUrl: 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=400&q=80',
-    createdAt: new Date().toISOString(),
-  },
-
-  // --- ARTISAN DEPOSIT GOODS ---
-  {
-    id: 'ITEM-001',
-    name: 'Hand-dyed Artisanal Silk Pareo',
-    brand: 'Bora Silk',
-    category: 'Pareos',
-    productLine: 'Handmade Silk',
-    size: 'One Size',
-    variant: 'Hibiscus Cyan',
-    sku: '893400101',
-    stockLevel: 18,
-    minStockThreshold: 5,
-    retailPrice: 45.00,
-    costBasis: 29.25, // 65% to vendor ($45 * 0.65)
-    vatRate: 0.15,
-    taxable: true,
-    vendorId: 'VEND-003',
-    imageUrl: 'https://images.unsplash.com/photo-1523381210434-271e8be1f52b?auto=format&fit=crop&w=400&q=80',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'ITEM-002',
-    name: 'Coconut Lime Organic Soap',
-    brand: 'Island Botanicals',
-    category: 'Soaps',
-    productLine: 'Botanical Care',
-    size: '150g Bar',
-    variant: 'Coconut Lime',
-    sku: '893400102',
-    stockLevel: 24,
-    minStockThreshold: 8,
-    retailPrice: 12.00,
-    costBasis: 8.40, // 70% to Alan
-    vatRate: 0.15,
-    taxable: true,
-    vendorId: 'VEND-001',
-    imageUrl: 'https://images.unsplash.com/photo-1607006344380-b6775a0824a7?auto=format&fit=crop&w=400&q=80',
-    createdAt: new Date().toISOString(),
-  },
-];
+// Inventory starts empty - real products are added by the admin
+const DEFAULT_INVENTORY: InventoryItem[] = [];
 
 // Helper to generate seed historical transactions for analytics
-function generateSeedTransactions(vendors: Vendor[], items: InventoryItem[]): Transaction[] {
-  const transactions: Transaction[] = [];
-  const now = new Date();
-
-  // Create 12 transactions over the past 3 days
-  for (let i = 1; i <= 12; i++) {
-    const hoursAgo = (12 - i) * 6 + (i % 4);
-    const txDate = new Date(now.getTime() - hoursAgo * 3600 * 1000);
-
-    const item1 = items[i % items.length];
-    const item2 = items[(i + 4) % items.length];
-    const vendor1 = vendors.find((v) => v.id === item1.vendorId) || vendors[0];
-    const vendor2 = vendors.find((v) => v.id === item2.vendorId) || vendors[1];
-
-    const qty1 = (i % 2) + 1;
-    const qty2 = 1;
-
-    // Calculate payouts & VAT
-    const vatRate1 = item1.vatRate ?? 0.15;
-    const item1NetPrice = item1.retailPrice * qty1;
-    const item1Vat = Number((item1NetPrice * vatRate1).toFixed(2));
-
-    const vatRate2 = item2.vatRate ?? 0.15;
-    const item2NetPrice = item2.retailPrice * qty2;
-    const item2Vat = Number((item2NetPrice * vatRate2).toFixed(2));
-
-    const item1Payout = vendor1.supplierType === 'consignment'
-      ? item1NetPrice * (1 - vendor1.consignmentCutRate)
-      : item1.costBasis * qty1;
-    const item1Profit = item1NetPrice - item1Payout;
-
-    const item2Payout = vendor2.supplierType === 'consignment'
-      ? item2NetPrice * (1 - vendor2.consignmentCutRate)
-      : item2.costBasis * qty2;
-    const item2Profit = item2NetPrice - item2Payout;
-
-    const txItems: TransactionItem[] = [
-      {
-        itemId: item1.id,
-        name: item1.name,
-        brand: item1.brand,
-        category: item1.category,
-        productLine: item1.productLine,
-        size: item1.size,
-        variant: item1.variant,
-        sku: item1.sku,
-        quantity: qty1,
-        unitPrice: item1.retailPrice,
-        totalPrice: item1NetPrice,
-        vatRate: vatRate1,
-        vatAmount: item1Vat,
-        vendorId: vendor1.id,
-        vendorName: vendor1.name,
-        supplierType: vendor1.supplierType,
-        costBasis: item1.costBasis,
-        vendorPayoutAmount: Number(item1Payout.toFixed(2)),
-        houseProfitAmount: Number(item1Profit.toFixed(2)),
-      },
-      {
-        itemId: item2.id,
-        name: item2.name,
-        brand: item2.brand,
-        category: item2.category,
-        productLine: item2.productLine,
-        size: item2.size,
-        variant: item2.variant,
-        sku: item2.sku,
-        quantity: qty2,
-        unitPrice: item2.retailPrice,
-        totalPrice: item2NetPrice,
-        vatRate: vatRate2,
-        vatAmount: item2Vat,
-        vendorId: vendor2.id,
-        vendorName: vendor2.name,
-        supplierType: vendor2.supplierType,
-        costBasis: item2.costBasis,
-        vendorPayoutAmount: Number(item2Payout.toFixed(2)),
-        houseProfitAmount: Number(item2Profit.toFixed(2)),
-      },
-    ];
-
-    const subtotal = txItems.reduce((acc, curr) => acc + curr.totalPrice, 0);
-    const vatTotal = Number(txItems.reduce((acc, curr) => acc + curr.vatAmount, 0).toFixed(2));
-    const total = Number((subtotal + vatTotal).toFixed(2));
-    const paymentMethod = i % 3 === 0 ? 'cash' : 'card';
-
-    transactions.push({
-      id: `TX-${1000 + i}`,
-      receiptNumber: `INV-${txDate.getFullYear()}${(txDate.getMonth() + 1).toString().padStart(2, '0')}${txDate.getDate().toString().padStart(2, '0')}-${100 + i}`,
-      timestamp: txDate.toISOString(),
-      cashierName: i % 2 === 0 ? 'Maya Cashier' : 'Store Admin',
-      subtotal,
-      vatTotal,
-      tax: vatTotal,
-      discount: 0,
-      total,
-      paymentMethod,
-      cashGiven: paymentMethod === 'cash' ? Math.ceil(total / 10) * 10 : undefined,
-      changeDue: paymentMethod === 'cash' ? Math.ceil(total / 10) * 10 - total : undefined,
-      items: txItems,
-    });
-  }
-
-  return transactions;
-}
 
 class PosDatabase {
   private vendors: Vendor[] = [];
@@ -690,6 +116,8 @@ class PosDatabase {
   private categories: CategoryTab[] = [];
   private drawerLogs: CashDrawerLog[] = [];
   private customers: Customer[] = [];
+  private vendorAdvances: VendorAdvance[] = [];
+  private invoices: Invoice[] = [];
 
   constructor() {
     this.initDatabase();
@@ -709,6 +137,8 @@ class PosDatabase {
       const ct = localStorage.getItem(STORAGE_KEYS.CATEGORIES);
       const dl = localStorage.getItem(STORAGE_KEYS.DRAWER_LOGS);
       const cust = localStorage.getItem(STORAGE_KEYS.CUSTOMERS);
+      const adv = localStorage.getItem(STORAGE_KEYS.ADVANCES);
+      const inv = localStorage.getItem(STORAGE_KEYS.INVOICES);
 
       this.vendors = v ? JSON.parse(v) : DEFAULT_VENDORS;
       this.inventory = i ? JSON.parse(i) : DEFAULT_INVENTORY;
@@ -718,28 +148,15 @@ class PosDatabase {
       this.categories = ct ? JSON.parse(ct) : DEFAULT_CATEGORIES;
       this.drawerLogs = dl ? JSON.parse(dl) : DEFAULT_DRAWER_LOGS;
       this.customers = cust ? JSON.parse(cust) : DEFAULT_CUSTOMERS;
+      this.vendorAdvances = adv ? JSON.parse(adv) : [];
+      this.invoices = inv ? JSON.parse(inv) : [];
 
-      this.eodSessions = e ? JSON.parse(e) : [
-        {
-          id: 'EOD-001',
-          date: new Date().toISOString().split('T')[0],
-          openedAt: new Date(Date.now() - 6 * 3600 * 1000).toISOString(),
-          startingFloat: 200.00,
-          cashSales: 0,
-          cardSales: 0,
-          paidInTotal: 50.00,
-          paidOutTotal: 0,
-          cashDropTotal: 100.00,
-          expectedCash: 150.00,
-          status: 'open',
-          notes: 'Shift opened with $200 float.',
-        },
-      ];
+      this.eodSessions = e ? JSON.parse(e) : [];
 
       if (t) {
         this.transactions = JSON.parse(t);
       } else {
-        this.transactions = generateSeedTransactions(this.vendors, this.inventory);
+        this.transactions = [];
         this.saveTransactions();
       }
 
@@ -754,7 +171,7 @@ class PosDatabase {
     } catch {
       this.vendors = DEFAULT_VENDORS;
       this.inventory = DEFAULT_INVENTORY;
-      this.transactions = generateSeedTransactions(DEFAULT_VENDORS, DEFAULT_INVENTORY);
+      this.transactions = [];
       this.eodSessions = [];
       this.settings = DEFAULT_SETTINGS;
       this.staffUsers = DEFAULT_STAFF;
@@ -809,7 +226,7 @@ class PosDatabase {
   public resetToDefault() {
     this.vendors = DEFAULT_VENDORS;
     this.inventory = DEFAULT_INVENTORY;
-    this.transactions = generateSeedTransactions(DEFAULT_VENDORS, DEFAULT_INVENTORY);
+    this.transactions = [];
     this.payouts = [];
     this.settings = DEFAULT_SETTINGS;
     this.drawerLogs = DEFAULT_DRAWER_LOGS;
@@ -836,6 +253,116 @@ class PosDatabase {
     this.saveEODSessions();
     this.saveSettings();
     this.saveDrawerLogs();
+  }
+
+  // --- VENDOR ADVANCES (partial payments against consignment balance) ---
+  public getVendorAdvances(vendorId?: string): VendorAdvance[] {
+    let list = [...this.vendorAdvances];
+    if (vendorId) list = list.filter((a) => a.vendorId === vendorId);
+    return list.sort((a, b) => b.date.localeCompare(a.date));
+  }
+
+  public recordVendorAdvance(advance: Omit<VendorAdvance, 'id' | 'date'>): VendorAdvance {
+    const newAdvance: VendorAdvance = {
+      ...advance,
+      id: `ADV-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`,
+      date: new Date().toISOString(),
+    };
+    this.vendorAdvances.unshift(newAdvance);
+    localStorage.setItem(STORAGE_KEYS.ADVANCES, JSON.stringify(this.vendorAdvances));
+    return newAdvance;
+  }
+
+  // --- INVOICES (hotel / wholesale orders) ---
+  public getInvoices(): Invoice[] {
+    return [...this.invoices].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+
+  public saveInvoice(invoice: Invoice): Invoice {
+    const idx = this.invoices.findIndex((i) => i.id === invoice.id);
+    if (idx >= 0) {
+      this.invoices[idx] = invoice;
+    } else {
+      this.invoices.unshift(invoice);
+    }
+    localStorage.setItem(STORAGE_KEYS.INVOICES, JSON.stringify(this.invoices));
+    return invoice;
+  }
+
+  public deleteInvoice(id: string): void {
+    this.invoices = this.invoices.filter((i) => i.id !== id);
+    localStorage.setItem(STORAGE_KEYS.INVOICES, JSON.stringify(this.invoices));
+  }
+
+  public nextInvoiceNumber(): string {
+    const year = new Date().getFullYear();
+    const count = this.invoices.filter((i) => i.invoiceNumber.includes(String(year))).length + 1;
+    return `INV-${year}-${String(count).padStart(4, '0')}`;
+  }
+
+  // --- BACKUP / RESTORE (full data export for USB stick or file) ---
+  public exportBackup(): string {
+    return JSON.stringify(
+      {
+        app: 'BoutiquePOS',
+        exportedAt: new Date().toISOString(),
+        vendors: this.vendors,
+        inventory: this.inventory,
+        transactions: this.transactions,
+        payouts: this.payouts,
+        eodSessions: this.eodSessions,
+        settings: this.settings,
+        staff: this.staffUsers,
+        categories: this.categories,
+        drawerLogs: this.drawerLogs,
+        customers: this.customers,
+        vendorAdvances: this.vendorAdvances,
+        invoices: this.invoices,
+      },
+      null,
+      2
+    );
+  }
+
+  public importBackup(json: string): { ok: boolean; error?: string } {
+    try {
+      const data = JSON.parse(json);
+      if (!data || data.app !== 'BoutiquePOS') {
+        return { ok: false, error: 'This file is not a BoutiquePOS backup.' };
+      }
+      if (Array.isArray(data.vendors)) this.vendors = data.vendors;
+      if (Array.isArray(data.inventory)) this.inventory = data.inventory;
+      if (Array.isArray(data.transactions)) this.transactions = data.transactions;
+      if (Array.isArray(data.payouts)) this.payouts = data.payouts;
+      if (Array.isArray(data.eodSessions)) this.eodSessions = data.eodSessions;
+      if (data.settings) this.settings = data.settings;
+      if (Array.isArray(data.staff)) this.staffUsers = data.staff;
+      if (Array.isArray(data.categories)) this.categories = data.categories;
+      if (Array.isArray(data.drawerLogs)) this.drawerLogs = data.drawerLogs;
+      if (Array.isArray(data.customers)) this.customers = data.customers;
+      if (Array.isArray(data.vendorAdvances)) this.vendorAdvances = data.vendorAdvances;
+      if (Array.isArray(data.invoices)) this.invoices = data.invoices;
+
+      this.saveVendors();
+      this.saveInventory();
+      this.saveTransactions();
+      this.savePayouts();
+      this.saveEODSessions();
+      this.saveSettings();
+      this.saveStaff();
+      this.saveDrawerLogs();
+      localStorage.setItem(STORAGE_KEYS.CUSTOMERS, JSON.stringify(this.customers));
+      localStorage.setItem(STORAGE_KEYS.ADVANCES, JSON.stringify(this.vendorAdvances));
+      localStorage.setItem(STORAGE_KEYS.INVOICES, JSON.stringify(this.invoices));
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  }
+
+  public markBackupDone(): void {
+    this.settings.lastBackupAt = new Date().toISOString();
+    this.saveSettings();
   }
 
   // --- SETTINGS & VAT ---

@@ -115,6 +115,32 @@ export const InventoryAdmin: React.FC<InventoryAdminProps> = ({
     setIsItemModalOpen(true);
   };
 
+  // Compress & store a product photo as a small JPEG data URL (offline-safe)
+  const handleImageFile = (file?: File | null) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      alert('Please choose an image file (JPG, PNG, etc.).');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new window.Image();
+      img.onload = () => {
+        const maxDim = 480;
+        const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(img.width * scale));
+        canvas.height = Math.max(1, Math.round(img.height * scale));
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        setFormData((f) => ({ ...f, imageUrl: canvas.toDataURL('image/jpeg', 0.75) }));
+      };
+      img.src = String(reader.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleSaveItem = (e?: React.FormEvent, shouldPrint: boolean = false) => {
     if (e) e.preventDefault();
 
@@ -453,6 +479,49 @@ export const InventoryAdmin: React.FC<InventoryAdminProps> = ({
                   placeholder="e.g. Ocean Seychelles T-Shirt - Turtle Cove (Adult M)"
                   className="w-full bg-[#0F1115] border border-[#1E293B] rounded-lg px-3 py-2 text-xs text-[#E2E8F0] focus:outline-none focus:border-emerald-500"
                 />
+              </div>
+
+              {/* Product Photo Upload */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Product Photo (shown on the register)
+                </label>
+                <div className="flex items-center gap-3">
+                  {formData.imageUrl ? (
+                    <img
+                      src={formData.imageUrl}
+                      alt="Product preview"
+                      className="w-16 h-16 rounded-lg object-cover border border-[#1E293B]"
+                    />
+                  ) : (
+                    <div className="w-16 h-16 rounded-lg bg-[#0F1115] border border-dashed border-slate-700 flex items-center justify-center text-[10px] text-slate-500 text-center">
+                      No photo
+                    </div>
+                  )}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-colors w-fit">
+                      Choose Photo…
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          handleImageFile(e.target.files?.[0]);
+                          e.currentTarget.value = '';
+                        }}
+                      />
+                    </label>
+                    {formData.imageUrl && (
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, imageUrl: '' })}
+                        className="text-rose-400 hover:text-rose-300 text-xs font-semibold w-fit"
+                      >
+                        Remove photo
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">

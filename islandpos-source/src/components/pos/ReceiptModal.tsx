@@ -40,6 +40,17 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
     }
   }, [transaction]);
 
+  // Auto-print: fire the print dialog as soon as the receipt renders,
+  // if the admin enabled "print automatically at checkout".
+  const autoPrintFired = useRef(false);
+  useEffect(() => {
+    if (settings.autoPrintReceipt && !autoPrintFired.current) {
+      autoPrintFired.current = true;
+      const t = setTimeout(() => window.print(), 500);
+      return () => clearTimeout(t);
+    }
+  }, []);
+
   const handlePrint = () => {
     window.print();
   };

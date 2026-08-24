@@ -14,6 +14,7 @@ import {
   Download,
   X,
   FileSpreadsheet,
+  HardDriveDownload,
 } from 'lucide-react';
 import { posDb } from '../../services/db';
 import { CashDrawerLog, CashDrawerEventType } from '../../types/pos';
@@ -39,6 +40,7 @@ export const EODBalancing: React.FC<EODBalancingProps> = ({ onRefreshData }) => 
   // Cash Adjustment Modal State
   const [isAdjustmentModalOpen, setIsAdjustmentModalOpen] = useState(false);
   const [adjType, setAdjType] = useState<CashDrawerEventType>('paid_in');
+  const [forceBackup, setForceBackup] = useState(false);
   const [adjAmount, setAdjAmount] = useState('');
   const [adjStaff, setAdjStaff] = useState('Jane Doe');
   const [adjReason, setAdjReason] = useState('');
@@ -73,7 +75,24 @@ export const EODBalancing: React.FC<EODBalancingProps> = ({ onRefreshData }) => 
       setActualCashInput('');
       setCloseNotesInput('');
       onRefreshData();
+      // Forced end-of-day backup (Phase 5): cashier must save the day's data
+      const s = posDb.getSettings();
+      if (s.requireBackupOnDayClose !== false) {
+        setForceBackup(true);
+      }
     }
+  };
+
+  const downloadBackup = () => {
+    const blob = new Blob([posDb.exportBackup()], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `boutique-pos-backup-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    posDb.markBackupDone();
+    setForceBackup(false);
   };
 
   const handleOpenAdjustmentModal = (type: CashDrawerEventType) => {
@@ -884,6 +903,27 @@ export const EODBalancing: React.FC<EODBalancingProps> = ({ onRefreshData }) => 
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Forced end-of-day backup gate */}
+      {forceBackup && (
+        <div className="fixed inset-0 z-50 bg-[#0F1115]/90 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#161B22] border border-amber-500/40 rounded-2xl max-w-md w-full p-6 shadow-2xl text-center">
+            <div className="w-14 h-14 mx-auto rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center">
+              <HardDriveDownload className="w-7 h-7 text-amber-400" />
+            </div>
+            <h3 className="text-lg font-black text-[#E2E8F0] mt-4">Backup Required</h3>
+            <p className="text-xs text-slate-400 mt-2 mb-5">
+              The day is now closed. Save today's backup file before continuing — choose your USB pendrive or any safe location. This keeps your records safe.
+            </p>
+            <button
+              onClick={downloadBackup}
+              className="w-full bg-amber-600 hover:bg-amber-500 text-slate-950 font-black py-3 rounded-xl text-sm transition-colors"
+            >
+              Save Backup File Now
+            </button>
           </div>
         </div>
       )}

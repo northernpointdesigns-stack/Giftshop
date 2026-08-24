@@ -104,6 +104,46 @@ export interface Transaction {
   loyaltyPointsEarned?: number;
 }
 
+export interface VendorAdvance {
+  id: string;
+  vendorId: string;
+  vendorName: string;
+  amount: number;
+  date: string;
+  note?: string;
+  recordedBy: string;
+}
+
+export interface InvoiceLine {
+  description: string;
+  quantity: number;
+  unitPrice: number;
+}
+
+export type InvoiceStatus = 'draft' | 'sent' | 'partial' | 'paid' | 'cancelled';
+
+export interface InvoicePayment {
+  id: string;
+  amount: number;
+  date: string;
+  method: 'cash' | 'card' | 'transfer' | 'cheque';
+  reference?: string;
+  recordedBy: string;
+}
+
+export interface Invoice {
+  id: string;
+  invoiceNumber: string;
+  customerName: string;
+  customerContact?: string; // phone / email / address
+  lines: InvoiceLine[];
+  notes?: string;
+  status: InvoiceStatus;
+  payments: InvoicePayment[];
+  createdAt: string;
+  createdBy: string;
+}
+
 export interface ConsignmentPayoutRecord {
   id: string;
   vendorId: string;
@@ -202,6 +242,13 @@ export interface StoreSettings {
   defaultCurrencyMode?: 'primary' | 'secondary';
   // Up to 2 extra reference currencies shown as smaller equivalents on the Customer Display
   customerDisplayCurrencies?: DisplayCurrencyConfig[];
+  // Register view preference: picture grid or touch/scan rows
+  posViewMode?: 'grid' | 'quick';
+  // Print receipt automatically when payment amount is entered at checkout
+  autoPrintReceipt?: boolean;
+  // Force a backup download when closing the day (EOD)
+  requireBackupOnDayClose?: boolean;
+  lastBackupAt?: string;
 
   // Receipt Customization Fields
   receiptLogoUrl?: string;

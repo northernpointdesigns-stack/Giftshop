@@ -6,6 +6,7 @@ import {
   Users,
   Edit3,
   DollarSign,
+  Printer as PrinterIcon,
   Tag,
   Settings,
   LogOut,
@@ -263,6 +264,19 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
       posDb.deleteCategory(catName);
       loadBackendData();
     }
+  };
+
+  // Manual full-data backup download
+  const handleManualBackup = () => {
+    const blob = new Blob([posDb.exportBackup()], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `boutique-pos-backup-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    posDb.markBackupDone();
+    setSettings({ ...settings, lastBackupAt: new Date().toISOString() });
   };
 
   // Store Settings Handler
@@ -1447,7 +1461,7 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
                     )}
 
                     <div className="font-bold text-sm uppercase tracking-wider text-slate-900">
-                      {settings.storeName || 'Seychelles Island Boutique'}
+                      {settings.storeName || 'My Boutique'}
                     </div>
 
                     {settings.receiptHeaderSubtitle && (
@@ -1963,7 +1977,14 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
                     </label>
                     <select
                       value={settings.customThemeColor || 'emerald'}
-                      onChange={(e) => setSettings({ ...settings, customThemeColor: e.target.value as any })}
+                      onChange={(e) => {
+                        const next = { ...settings, customThemeColor: e.target.value as any };
+                        setSettings(next);
+                        // Apply the theme instantly (bugfix: previously only
+                        // applied after clicking Save, easy to miss)
+                        posDb.updateSettings({ customThemeColor: next.customThemeColor });
+                        onRefreshData();
+                      }}
                       className="w-full bg-[#161B22] border border-[#1E293B] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 font-semibold"
                     >
                       <option value="emerald">Emerald Green (Default)</option>
@@ -2295,6 +2316,79 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
                 <p className="text-[10px] text-slate-500 mt-2">
                   Tip: The main currency (above) always stays as the big TOTAL DUE. These currencies appear underneath it so customers can see the price in their own money.
                 </p>
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-[#1E293B]">
+              <h3 className="text-sm font-bold text-[#E2E8F0] flex items-center gap-2 mb-3">
+                <PrinterIcon className="w-4 h-4 text-emerald-400" /> Printing & Data Safety
+              </h3>
+              <div className="space-y-3 text-xs">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={settings.autoPrintReceipt === true}
+                    onChange={(e) => {
+                      posDb.updateSettings({ autoPrintReceipt: e.target.checked });
+                      setSettings({ ...settings, autoPrintReceipt: e.target.checked });
+                    }}
+                    className="rounded text-emerald-600 focus:ring-emerald-500 h-4 w-4"
+                  />
+                  <span className="text-slate-300 font-medium">
+                    Print receipt automatically when payment is entered at checkout
+                  </span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={settings.requireBackupOnDayClose !== false}
+                    onChange={(e) => {
+                      posDb.updateSettings({ requireBackupOnDayClose: e.target.checked });
+                      setSettings({ ...settings, requireBackupOnDayClose: e.target.checked });
+                    }}
+                    className="rounded text-emerald-600 focus:ring-emerald-500 h-4 w-4"
+                  />
+                  <span className="text-slate-300 font-medium">
+                    Require a backup file when closing the day (recommended — save to USB pendrive)
+                  </span>
+                </label>
+
+                <div className="flex flex-wrap items-center gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={handleManualBackup}
+                    className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-3 py-2 rounded-xl font-bold transition-colors"
+                  >
+                    Backup Now (save file)
+                  </button>
+                  <label className="bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 px-3 py-2 rounded-xl font-bold cursor-pointer transition-colors">
+                    Restore from Backup File…
+                    <input
+                      type="file"
+                      accept="application/json,.json"
+                      className="hidden"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (!f) return;
+                        const reader = new FileReader();
+                        reader.onload = () => {
+                          if (confirm('Restore this backup? Current data will be replaced.')) {
+                            const res = posDb.importBackup(String(reader.result));
+                            alert(res.ok ? 'Backup restored successfully!' : `Restore failed: ${res.error}`);
+                            if (res.ok) loadBackendData();
+                          }
+                        };
+                        reader.readAsText(f);
+                        e.currentTarget.value = '';
+                      }}
+                    />
+                  </label>
+                  {settings.lastBackupAt && (
+                    <span className="text-[10px] text-slate-500 font-mono">
+                      Last backup: {new Date(settings.lastBackupAt).toLocaleString()}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
 

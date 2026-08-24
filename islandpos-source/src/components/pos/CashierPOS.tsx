@@ -19,6 +19,8 @@ import {
   UserCheck,
   Users,
   Award,
+  LayoutGrid,
+  Zap,
 } from 'lucide-react';
 import { Customer, InventoryItem, Transaction } from '../../types/pos';
 import { posDb } from '../../services/db';
@@ -54,6 +56,12 @@ export const CashierPOS: React.FC<CashierPOSProps> = ({
   const [selectedBrand, setSelectedBrand] = useState<string>('All');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  // POS view mode: 'grid' = picture cards, 'quick' = touch/scan-first compact rows
+  const [viewMode, setViewMode] = useState<'grid' | 'quick'>(settings.posViewMode || 'grid');
+  const changeViewMode = (mode: 'grid' | 'quick') => {
+    setViewMode(mode);
+    posDb.updateSettings({ posViewMode: mode });
+  };
   const [cart, setCart] = useState<CartItem[]>([]);
   const [discountAmount, setDiscountAmount] = useState<number>(0);
   const [heldCart, setHeldCart] = useState<CartItem[] | null>(null);
@@ -119,6 +127,9 @@ export const CashierPOS: React.FC<CashierPOSProps> = ({
     const matchesSize = item.size ? item.size.toLowerCase().includes(query) : false;
     const matchesVariant = item.variant ? item.variant.toLowerCase().includes(query) : false;
     const matchesLine = item.productLine ? item.productLine.toLowerCase().includes(query) : false;
+    // Manual fallback: also match by vendor/supplier name
+    const vendorName = posDb.getVendorById(item.vendorId)?.name?.toLowerCase() || '';
+    const matchesVendor = query ? vendorName.includes(query) : false;
 
     return (
       matchesBrand &&
@@ -129,7 +140,8 @@ export const CashierPOS: React.FC<CashierPOSProps> = ({
         matchesBrandText ||
         matchesSize ||
         matchesVariant ||
-        matchesLine)
+        matchesLine ||
+        matchesVendor)
     );
   });
 
@@ -370,6 +382,35 @@ export const CashierPOS: React.FC<CashierPOSProps> = ({
               )}
             </div>
 
+            {/* View Mode Toggle: Picture Grid vs Touch/Scan */}
+            <div className="flex items-center justify-between pt-1">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-1">
+                Register View
+              </span>
+              <div className="flex bg-[#0F1115] border border-[#1E293B] rounded-xl p-1 gap-1">
+                <button
+                  onClick={() => changeViewMode('grid')}
+                  className={`px-3 py-1.5 rounded-lg text-[11px] font-bold flex items-center gap-1.5 transition-all ${
+                    viewMode === 'grid'
+                      ? 'bg-emerald-600 text-white shadow-md'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <LayoutGrid className="w-3.5 h-3.5" /> Pictures
+                </button>
+                <button
+                  onClick={() => changeViewMode('quick')}
+                  className={`px-3 py-1.5 rounded-lg text-[11px] font-bold flex items-center gap-1.5 transition-all ${
+                    viewMode === 'quick'
+                      ? 'bg-cyan-600 text-white shadow-md'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <Zap className="w-3.5 h-3.5" /> Touch / Scan
+                </button>
+              </div>
+            </div>
+
             {/* Category Filter Pills Bar */}
             <div className="space-y-2">
               <div className="flex items-center justify-between text-[11px] font-bold text-slate-400 uppercase tracking-wider px-1">
@@ -453,6 +494,41 @@ export const CashierPOS: React.FC<CashierPOSProps> = ({
                 <RotateCcw className="w-3.5 h-3.5" />
                 <span>Show All Inventory Items</span>
               </button>
+            </div>
+          ) : viewMode === 'quick' ? (
+            /* Touch/Scan-first compact rows */
+            <div className="space-y-2 max-h-[580px] overflow-y-auto pr-1">
+              {filteredInventory.map((item) => {
+                const vendor = posDb.getVendorById(item.vendorId);
+                return (
+                  <button
+                    key={item.id}
+                    disabled={item.stockLevel === 0}
+                    onClick={() => handleAddToCart(item)}
+                    className="w-full bg-[#161B22] border border-[#1E293B] hover:border-emerald-500/80 rounded-xl p-2.5 flex items-center gap-3 text-left transition-all active:scale-[0.99] disabled:opacity-50"
+                  >
+                    {item.imageUrl ? (
+                      <img src={item.imageUrl} alt={item.name} className="w-12 h-12 rounded-lg object-cover shrink-0 border border-[#1E293B]" />
+                    ) : (
+                      <div className="w-12 h-12 rounded-lg bg-[#0F1115] border border-[#1E293B] flex items-center justify-center text-slate-600 text-xs font-black shrink-0">
+                        {item.name.slice(0, 2).toUpperCase()}
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-semibold text-[#E2E8F0] truncate">{item.name}</div>
+                      <div className="text-[10px] text-slate-500 truncate">
+                        {item.brand || 'Ocean'} • {vendor?.name || 'House Stock'} • SKU: {item.sku}
+                        {item.stockLevel <= item.minStockThreshold && (
+                          <span className="text-amber-400"> • Only {item.stockLevel} left</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="font-mono font-bold text-emerald-400 text-sm shrink-0">
+                      {primarySymbol} {item.retailPrice.toFixed(2)}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3 max-h-[580px] overflow-y-auto pr-1">

@@ -16,17 +16,21 @@ import { VersionUpdateModal } from './components/alerts/VersionUpdateModal';
 import { posDb } from './services/db';
 import { InventoryItem, Vendor, Transaction, StaffUser } from './types/pos';
 import { StaffLoginScreen } from './components/auth/StaffLoginScreen';
+import { OpeningFloatGate } from './components/auth/OpeningFloatGate';
+import { InvoiceManager } from './components/admin/InvoiceManager';
 
 export default function App() {
   // Check if opened as standalone customer secondary window (e.g. ?view=customer)
   const isCustomerWindow = typeof window !== 'undefined' && window.location.search.includes('view=customer');
 
-  const [activeTab, setActiveTab] = useState<'pos' | 'inventory' | 'vendors' | 'payouts' | 'reports' | 'admin'>('pos');
+  const [activeTab, setActiveTab] = useState<'pos' | 'inventory' | 'vendors' | 'payouts' | 'reports' | 'invoices' | 'admin'>('pos');
   const [reportsSubTab, setReportsSubTab] = useState<'eod' | 'pnl' | 'forecasting'>('eod');
 
   // Admin Security State
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [currentStaff, setCurrentStaff] = useState<StaffUser | null>(null);
+  // Mandatory opening cash float gate (Phase 1)
+  const [hasActiveDay, setHasActiveDay] = useState(() => !!posDb.getActiveEODSession());
 
   // Live Database State
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
@@ -161,6 +165,20 @@ export default function App() {
     );
   }
 
+  // Mandatory opening cash float — the register cannot be used until today's
+  // float is declared. Creates the EOD session for the day.
+  if (!hasActiveDay) {
+    return (
+      <OpeningFloatGate
+        storeName={settings.storeName || 'BoutiquePOS'}
+        storeTagline={settings.receiptHeaderSubtitle}
+        cashierName={currentStaff.name}
+        currencySymbol={settings.primaryCurrencySymbol || 'SR'}
+        onConfirmed={() => setHasActiveDay(true)}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#0F1115] text-[#E2E8F0] flex flex-col font-sans selection:bg-emerald-500 selection:text-[#0F1115]">
       {/* Top Bar adhereing to contract */}
@@ -205,6 +223,11 @@ export default function App() {
         {/* TAB 4: Consignment Payout Settlement */}
         {activeTab === 'payouts' && (
           <ConsignmentPayoutReport vendors={vendors} onRefreshData={refreshData} />
+        )}
+
+        {/* TAB 4b: Invoices & Orders (admin only) */}
+        {activeTab === 'invoices' && isAdminLoggedIn && (
+          <InvoiceManager onRefreshData={refreshData} />
         )}
 
         {/* TAB 5: Reports (EOD Balancing & Financial P&L) */}

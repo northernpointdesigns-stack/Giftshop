@@ -11,8 +11,8 @@ import {
 import { posDb } from '../services/db';
 
 interface NavbarProps {
-  activeTab: 'pos' | 'inventory' | 'vendors' | 'payouts' | 'reports' | 'admin';
-  setActiveTab: (tab: 'pos' | 'inventory' | 'vendors' | 'payouts' | 'reports' | 'admin') => void;
+  activeTab: 'pos' | 'inventory' | 'vendors' | 'payouts' | 'reports' | 'invoices' | 'admin';
+  setActiveTab: (tab: 'pos' | 'inventory' | 'vendors' | 'payouts' | 'reports' | 'invoices' | 'admin') => void;
   lowStockCount: number;
   onOpenLowStockModal: () => void;
   onOpenCustomerDisplay: () => void;
@@ -119,7 +119,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const selectTab = (tab: 'pos' | 'inventory' | 'vendors' | 'payouts' | 'reports' | 'admin') => {
+  const selectTab = (tab: 'pos' | 'inventory' | 'vendors' | 'payouts' | 'reports' | 'invoices' | 'admin') => {
     const allowed = isAdminLoggedIn || (
       tab === 'pos' ? cashierAccess.pos :
       tab === 'inventory' ? cashierAccess.inventory :
@@ -132,7 +132,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     setIsMoreOpen(false);
   };
 
-  const moreTabsActive = ['payouts', 'reports', 'admin'].includes(activeTab);
+  const moreTabsActive = ['payouts', 'reports', 'invoices', 'admin'].includes(activeTab);
 
   return (
     <header className="sticky top-0 z-40 bg-[#161B22] border-b border-[#1E293B] text-[#E2E8F0] px-4 py-3 shadow-md shrink-0">
@@ -200,6 +200,18 @@ export const Navbar: React.FC<NavbarProps> = ({
             {payoutsLabel}
           </button>}
 
+          {/* Large Screen Only: Invoices (admin only) */}
+          {isAdminLoggedIn && <button
+            onClick={() => selectTab('invoices')}
+            className={`hidden lg:inline-flex px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap shrink-0 ${
+              activeTab === 'invoices'
+                ? `bg-slate-800/80 ${activeTextClass} border border-slate-700/60`
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
+            }`}
+          >
+            Invoices
+          </button>}
+
           {(isAdminLoggedIn || cashierAccess.reports) && <button
             onClick={() => selectTab('reports')}
             className={`hidden lg:inline-flex px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap shrink-0 ${
@@ -250,6 +262,16 @@ export const Navbar: React.FC<NavbarProps> = ({
                   }`}
                 >
                   {payoutsLabel}
+                </button>}
+                {isAdminLoggedIn && <button
+                  onClick={() => selectTab('invoices')}
+                  className={`w-full text-left px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${
+                    activeTab === 'invoices'
+                      ? `bg-slate-800/80 ${activeTextClass} font-bold`
+                      : 'text-slate-300 hover:bg-slate-800/50'
+                  }`}
+                >
+                  Invoices
                 </button>}
                 {(isAdminLoggedIn || cashierAccess.reports) && <button
                   onClick={() => selectTab('reports')}

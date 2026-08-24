@@ -30,6 +30,28 @@ export const ConsignmentPayoutReport: React.FC<ConsignmentPayoutReportProps> = (
   const [activeSubTab, setActiveSubTab] = useState<'statements' | 'itemized'>('statements');
   const [itemizedSearchQuery, setItemizedSearchQuery] = useState<string>('');
 
+  // Vendor advances (money given early against future sales balance)
+  const [advancingVendor, setAdvancingVendor] = useState<{ id: string; name: string } | null>(null);
+  const [advanceAmount, setAdvanceAmount] = useState('');
+  const [advanceNote, setAdvanceNote] = useState('');
+
+  const handleGiveAdvance = () => {
+    if (!advancingVendor) return;
+    const amt = parseFloat(advanceAmount);
+    if (isNaN(amt) || amt <= 0) return;
+    posDb.recordVendorAdvance({
+      vendorId: advancingVendor.id,
+      vendorName: advancingVendor.name,
+      amount: Number(amt.toFixed(2)),
+      note: advanceNote || 'Advance against consignment balance',
+      recordedBy: 'Admin',
+    });
+    setAdvancingVendor(null);
+    setAdvanceAmount('');
+    setAdvanceNote('');
+    onRefreshData();
+  };
+
   const settings = posDb.getSettings();
   const primarySymbol = settings.primaryCurrencySymbol || 'SR';
   const primaryCode = settings.primaryCurrency || 'SCR';
@@ -42,6 +64,7 @@ export const ConsignmentPayoutReport: React.FC<ConsignmentPayoutReportProps> = (
     selectedVendorId === 'All' ? undefined : selectedVendorId
   );
   const payoutHistory = posDb.getPayoutRecords();
+  const allAdvances = posDb.getVendorAdvances();
 
   const totalPayoutOwedAll = payoutCalculations.reduce((acc, c) => acc + c.vendorPayoutOwed, 0);
   const totalGrossSalesAll = payoutCalculations.reduce((acc, c) => acc + c.totalGrossSales, 0);
@@ -287,7 +310,11 @@ export const ConsignmentPayoutReport: React.FC<ConsignmentPayoutReportProps> = (
             </h3>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {payoutCalculations.map(({ vendor, totalUnitsSold, totalGrossSales, vendorPayoutOwed, houseCommission }) => (
+              {payoutCalculations.map(({ vendor, totalUnitsSold, totalGrossSales, vendorPayoutOwed, houseCommission }) => {
+                const vendorAdvances = allAdvances.filter((a) => a.vendorId === vendor.id);
+                const totalAdvanced = vendorAdvances.reduce((s, a) => s + a.amount, 0);
+                const balanceAfterAdvances = Math.max(0, vendorPayoutOwed - totalAdvanced);
+                return (
                 <div
                   key={vendor.id}
                   className="bg-[#161B22] border border-[#1E293B] rounded-xl p-5 shadow-md flex flex-col justify-between"
@@ -324,38 +351,113 @@ export const ConsignmentPayoutReport: React.FC<ConsignmentPayoutReportProps> = (
                           {settings.allowPaymentInSecondary !== false && ` (-${secondarySymbol}${(houseCommission / exchangeRate).toFixed(2)} ${secondaryCode})`}
                         </span>
                       </div>
+                      {totalAdvanced > 0 && (
+                        <div className="flex justify-between text-slate-400">
+                          <span>Advances Given ({vendorAdvances.length}):</span>
+                          <span className="text-orange-400">-{primarySymbol} {totalAdvanced.toFixed(2)}</span>
+                        </div>
+                      )}
                       <div className="flex justify-between font-bold text-sm text-amber-400 pt-2 border-t border-[#1E293B]">
-                        <span>NET PAYOUT OWED:</span>
+                        <span>BALANCE OWED TO VENDOR:</span>
                         <span>
-                          {primarySymbol} {vendorPayoutOwed.toFixed(2)}
-                          {settings.allowPaymentInSecondary !== false && ` (${secondarySymbol}${(vendorPayoutOwed / exchangeRate).toFixed(2)} ${secondaryCode})`}
+                          {primarySymbol} {balanceAfterAdvances.toFixed(2)}
+                          {settings.allowPaymentInSecondary !== false && ` (${secondarySymbol}${(balanceAfterAdvances / exchangeRate).toFixed(2)} ${secondaryCode})`}
                         </span>
                       </div>
                     </div>
+
+                    {vendorAdvances.length > 0 && (
+                      <div className="mt-2 space-y-1">
+                        {vendorAdvances.slice(0, 3).map((a) => (
+                          <div key={a.id} className="flex items-center justify-between text-[10px] text-slate-500 font-mono bg-[#0F1115] rounded-lg px-2 py-1 border border-[#1E293B]">
+                            <span>{new Date(a.date).toLocaleDateString()} — {a.note}</span>
+                            <span className="text-orange-300">-{primarySymbol}{a.amount.toFixed(2)}</span>
+                          </div>
+                        ))}
+                        {vendorAdvances.length > 3 && (
+                          <p className="text-[10px] text-slate-600 pl-2">+ {vendorAdvances.length - 3} earlier advance(s)</p>
+                        )}
+                      </div>
+                    )}
                   </div>
 
-                  <div className="pt-2 border-t border-[#1E293B] flex items-center justify-between gap-2">
-                    <button
-                      onClick={() => window.print()}
-                      className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5"
-                    >
-                      <Printer className="w-3.5 h-3.5" />
-                      <span>Print Statement</span>
-                    </button>
+                  <div className="pt-2 border-t border-[#1E293B] flex items-center justify-between gap-2 mt-3">
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => window.print()}
+                        className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5"
+                      >
+                        <Printer className="w-3.5 h-3.5" />
+                        <span>Print Statement</span>
+                      </button>
+                      <button
+                        onClick={() => setAdvancingVendor({ id: vendor.id, name: vendor.name })}
+                        className="bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
+                      >
+                        + Give Advance
+                      </button>
+                    </div>
 
                     <button
-                      disabled={vendorPayoutOwed <= 0}
-                      onClick={() => handleProcessPayout(vendor.id, vendorPayoutOwed, vendor.name)}
+                      disabled={balanceAfterAdvances <= 0}
+                      onClick={() => handleProcessPayout(vendor.id, balanceAfterAdvances, vendor.name)}
                       className="bg-amber-600 hover:bg-amber-500 disabled:bg-slate-800 disabled:text-slate-600 text-slate-950 font-bold px-4 py-1.5 rounded-lg text-xs transition-colors flex items-center gap-1.5 shadow-sm"
                     >
                       <CheckCircle2 className="w-4 h-4" />
-                      <span>Mark Payout Settled</span>
+                      <span>Settle Balance</span>
                     </button>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
+
+          {/* Give Advance Modal */}
+          {advancingVendor && (
+            <div className="fixed inset-0 z-50 bg-[#0F1115]/80 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-[#161B22] border border-[#1E293B] rounded-2xl max-w-sm w-full p-6 shadow-2xl">
+                <h3 className="text-base font-bold text-[#E2E8F0]">Give Advance</h3>
+                <p className="text-xs text-slate-400 mt-1 mb-4">
+                  Record money given now to <strong className="text-slate-200">{advancingVendor.name}</strong>. It will be deducted from their consignment balance at settlement.
+                </p>
+                <div className="space-y-3">
+                  <input
+                    autoFocus
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    value={advanceAmount}
+                    onChange={(e) => setAdvanceAmount(e.target.value)}
+                    placeholder={`Amount (${primarySymbol})`}
+                    className="w-full bg-[#0F1115] border border-[#1E293B] rounded-xl px-3 py-2.5 text-sm font-mono text-white focus:outline-none focus:border-cyan-500"
+                  />
+                  <input
+                    type="text"
+                    value={advanceNote}
+                    onChange={(e) => setAdvanceNote(e.target.value)}
+                    placeholder="Note (optional)"
+                    className="w-full bg-[#0F1115] border border-[#1E293B] rounded-xl px-3 py-2.5 text-xs text-[#E2E8F0] focus:outline-none focus:border-cyan-500"
+                  />
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      onClick={() => setAdvancingVendor(null)}
+                      className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-2.5 rounded-xl text-xs transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleGiveAdvance}
+                      disabled={!(parseFloat(advanceAmount) > 0)}
+                      className="flex-1 bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-800 disabled:text-slate-600 text-white font-bold py-2.5 rounded-xl text-xs transition-colors"
+                    >
+                      Record Advance
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Payout History Log Table */}
           {payoutHistory.length > 0 && (
