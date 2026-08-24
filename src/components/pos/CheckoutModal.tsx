@@ -49,7 +49,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const exchangeRate = settings.exchangeRate || 13.50;
 
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'split'>('cash');
-  const [tenderCurrency, setTenderCurrency] = useState<'SCR' | 'USD'>('SCR');
+  // Payments are processed in the store's local currency. Other currencies
+  // are shown on the customer display for reference only.
+  const tenderCurrency = 'SCR';
   const [cashTenderedStr, setCashTenderedStr] = useState<string>('');
   const [cardAmountStr, setCardAmountStr] = useState<string>('');
   const [cashAmountStr, setCashAmountStr] = useState<string>('');
@@ -71,21 +73,15 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   // Initialize tender default
   useEffect(() => {
-    if (tenderCurrency === 'SCR') {
-      setCashTenderedStr(finalPayableTotal.toFixed(2));
-    } else {
-      setCashTenderedStr(Math.ceil(finalPayableSecondary).toString());
-    }
-  }, [finalPayableTotal, finalPayableSecondary, tenderCurrency]);
+    setCashTenderedStr(finalPayableTotal.toFixed(2));
+  }, [finalPayableTotal]);
 
   if (!isOpen) return null;
 
   const cashTenderedVal = parseFloat(cashTenderedStr) || 0;
-  const cashTenderedInSCR =
-    tenderCurrency === 'USD' ? cashTenderedVal * exchangeRate : cashTenderedVal;
+  const cashTenderedInSCR = cashTenderedVal;
 
   const changeDueInSCR = Math.max(0, cashTenderedInSCR - finalPayableTotal);
-  const changeDueInUSD = Number((changeDueInSCR / exchangeRate).toFixed(2));
   const isCashSufficient = cashTenderedInSCR >= finalPayableTotal - 0.01;
 
   // Preset bill buttons
@@ -97,15 +93,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     1000,
     2000,
   ].filter((val, idx, self) => val >= finalPayableTotal && self.indexOf(val) === idx).slice(0, 5);
-
-  const cashPresetsUSD = [
-    finalPayableSecondary,
-    Math.ceil(finalPayableSecondary),
-    Math.ceil(finalPayableSecondary / 10) * 10,
-    Math.ceil(finalPayableSecondary / 20) * 20,
-    50,
-    100,
-  ].filter((val, idx, self) => val >= finalPayableSecondary && self.indexOf(val) === idx).slice(0, 5);
 
   const handleProcessSale = () => {
     let finalTx: Omit<Transaction, 'id' | 'receiptNumber' | 'timestamp'>;
@@ -324,34 +311,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           {/* Dynamic Tender Options */}
           {paymentMethod === 'cash' && (
             <div className="space-y-3 bg-[#0F1115] border border-[#1E293B] rounded-xl p-4">
-              {/* Currency Toggle for Cash */}
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-300">Tender Currency:</span>
-                <div className="inline-flex bg-[#161B22] p-1 rounded-lg border border-[#1E293B]">
-                  <button
-                    type="button"
-                    onClick={() => setTenderCurrency('SCR')}
-                    className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
-                      tenderCurrency === 'SCR'
-                        ? 'bg-emerald-600 text-white'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    Seychelles Rupee (SCR)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setTenderCurrency('USD')}
-                    className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
-                      tenderCurrency === 'USD'
-                        ? 'bg-emerald-600 text-white'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    US Dollar (USD)
-                  </button>
-                </div>
-              </div>
+               <div className="flex items-center justify-between rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-3 py-2">
+                 <span className="text-xs font-bold text-slate-300">Tender currency</span>
+                 <span className="text-xs font-bold text-emerald-300">Seychelles Rupee (SCR)</span>
+               </div>
 
               {/* Cash Input */}
               <div>
@@ -360,7 +323,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 </label>
                 <div className="relative">
                   <span className="absolute left-3.5 top-2.5 text-sm font-bold text-slate-400 font-mono">
-                    {tenderCurrency === 'USD' ? secondarySymbol : primarySymbol}
+                     {primarySymbol}
                   </span>
                   <input
                     type="number"
@@ -374,14 +337,14 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
               {/* Preset Quick Cash Buttons */}
               <div className="flex flex-wrap gap-1.5 pt-1">
-                {(tenderCurrency === 'SCR' ? cashPresetsSCR : cashPresetsUSD).map((preset, idx) => (
+                 {cashPresetsSCR.map((preset, idx) => (
                   <button
                     key={idx}
                     type="button"
                     onClick={() => setCashTenderedStr(preset.toFixed(2))}
                     className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-mono font-semibold text-slate-200 border border-slate-700 transition-colors"
                   >
-                    {tenderCurrency === 'USD' ? secondarySymbol : primarySymbol} {preset.toFixed(2)}
+                     {primarySymbol} {preset.toFixed(2)}
                   </button>
                 ))}
               </div>
@@ -393,11 +356,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   <div className="text-lg font-extrabold text-emerald-400">
                     {primarySymbol} {changeDueInSCR.toFixed(2)}
                   </div>
-                  {tenderCurrency === 'USD' && (
-                    <div className="text-[11px] text-slate-400">
-                      ≈ {secondarySymbol} {changeDueInUSD.toFixed(2)} USD
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
