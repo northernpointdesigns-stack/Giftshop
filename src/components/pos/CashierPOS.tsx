@@ -387,8 +387,8 @@ export const CashierPOS: React.FC<CashierPOSProps> = ({
       )}
 
       {/* Cashier Control Bar */}
-      <div className="bg-[#161B22] border-b border-[#1E293B] px-3 sm:px-6 py-2 flex flex-wrap items-center justify-between gap-2 shrink-0">
-        <div className="flex items-center gap-3">
+       <div className="bg-[#161B22] border-b border-[#1E293B] px-3 sm:px-6 py-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 shrink-0">
+         <div className="flex items-center gap-2 sm:gap-3 min-w-0 overflow-x-auto scrollbar-none">
           {/* Cashier Switcher */}
           <div className="flex items-center gap-1.5 bg-[#0F1115] border border-[#1E293B] rounded-xl px-2.5 py-1 text-xs">
             <User className="w-3.5 h-3.5 text-emerald-400" />
@@ -433,7 +433,7 @@ export const CashierPOS: React.FC<CashierPOSProps> = ({
         </div>
 
         {/* Fast Action Buttons */}
-        <div className="flex items-center gap-1.5">
+         <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto scrollbar-none pb-0.5">
           <button
             onClick={() => setIsQuickAddOpen(true)}
             className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-[#0F1115] hover:bg-slate-800 border border-[#1E293B] text-slate-300 text-xs font-bold transition-colors"
@@ -489,7 +489,7 @@ export const CashierPOS: React.FC<CashierPOSProps> = ({
       </div>
 
       {/* Main POS Split Layout */}
-      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+       <div className="flex-1 flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden">
         {/* Left Side: Product Catalog Grid */}
         <div className="flex-1 flex flex-col min-w-0 border-r border-[#1E293B] bg-[#0B0D13]">
           {/* Search & Category Pills */}
@@ -618,7 +618,7 @@ export const CashierPOS: React.FC<CashierPOSProps> = ({
         </div>
 
         {/* Right Side: Active Cart & Checkout Panel */}
-        <div className="w-full lg:w-[420px] bg-[#161B22] flex flex-col justify-between shrink-0 h-[45vh] lg:h-auto">
+         <div className="w-full lg:w-[420px] bg-[#161B22] flex flex-col justify-between shrink-0 h-[52vh] min-h-[330px] lg:h-auto lg:min-h-0">
           {/* Cart Header */}
           <div className="p-3.5 bg-[#0F1115] border-b border-[#1E293B] flex items-center justify-between shrink-0">
             <div className="flex items-center gap-2">
@@ -784,11 +784,11 @@ export const CashierPOS: React.FC<CashierPOSProps> = ({
               </div>
 
               {/* Pay Button */}
-              <button
+               <button
                 type="button"
                 disabled={cart.length === 0}
                 onClick={() => setIsCheckoutOpen(true)}
-                className="px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 disabled:text-slate-600 text-white text-sm font-extrabold flex items-center gap-2 transition-all shadow-lg shadow-emerald-950/40"
+                 className="w-full sm:w-auto px-4 sm:px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 disabled:text-slate-600 text-white text-sm font-extrabold flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-950/40"
               >
                 <span>Charge (F2)</span>
                 <Banknote className="w-4 h-4" />
