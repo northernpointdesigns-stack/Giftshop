@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+app-source/dist-desktop/
+dist-desktop/
+
+# Huge pre-built packages (too big for GitHub — 100MB file limit)
+*.AppImage
+*.snap
+snap-extracted/
+BoutiquePOS-0.0.0.AppImage*
+BoutiquePOS-0.0.0.snap*
+*.dmg
+*.exe
+
+# Editor workspace files
+*.code-workspace
+
+# OS junk
+.DS_Store
+
+# Logs
+*.log
