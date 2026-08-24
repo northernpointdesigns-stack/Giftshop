@@ -18,10 +18,17 @@ import { soundService } from '../../services/audio';
 import { customerChannel } from '../../services/customerChannel';
 
 interface CheckoutModalProps {
-  cart: { item: InventoryItem; quantity: number }[];
+  cart: {
+    item: InventoryItem;
+    quantity: number;
+    isDamaged?: boolean;
+    damageDiscountPercent?: number;
+  }[];
   subtotal: number;
   tax: number;
   discount: number;
+  discountType?: 'amount' | 'percent';
+  discountValue?: number;
   total: number;
   attachedCustomer?: Customer | null;
   onClose: () => void;
@@ -33,6 +40,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   subtotal,
   tax,
   discount,
+  discountType = 'amount',
+  discountValue,
   total,
   attachedCustomer: initialCustomer,
   onClose,
@@ -63,16 +72,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     });
   }, [checkoutCurrency]);
 
-  // Multi-Currency Math
-  const subtotalSec = cart.reduce((sum, c) => {
-    const itemPriceSec = c.item.retailPriceSecondary && c.item.retailPriceSecondary > 0
-      ? c.item.retailPriceSecondary
-      : (c.item.retailPrice / exchangeRate);
-    return sum + (itemPriceSec * c.quantity);
-  }, 0);
+  // Multi-Currency Math — always derived from the primary-currency totals at
+  // the current admin-set exchange rate, so the cashier screen, checkout and
+  // customer display always show identical converted amounts.
+  const totalSec = Number((total / exchangeRate).toFixed(2));
+  const subtotalSec = Number(((total - tax + discount) / exchangeRate).toFixed(2));
   const discountSec = Number((discount / exchangeRate).toFixed(2));
   const taxSec = Number((tax / exchangeRate).toFixed(2));
-  const totalSec = Number((subtotalSec + taxSec - discountSec).toFixed(2));
 
   // Active pricing based on checkout selection
   const activeTotal = checkoutCurrency === 'primary' ? total : totalSec;
@@ -159,7 +165,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         checkoutCurrency,
         secondaryCashGiven,
         secondaryChangeDue,
-        totalSec
+        totalSec,
+        // Explicit ternary keeps the literal union even when prop typing degrades
+        {
+          type: discountType === 'percent' ? ('percent' as const) : ('amount' as const),
+          value: discountValue ?? 0,
+        }
       );
       setIsProcessing(false);
       onCompleteTransaction(tx);

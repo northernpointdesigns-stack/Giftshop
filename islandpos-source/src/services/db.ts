@@ -585,7 +585,12 @@ class PosDatabase {
   }
 
   public recordTransaction(
-    items: { item: InventoryItem; quantity: number }[],
+    items: {
+      item: InventoryItem;
+      quantity: number;
+      isDamaged?: boolean;
+      damageDiscountPercent?: number; // whole number, e.g. 50 => 50%
+    }[],
     paymentMethod: Transaction['paymentMethod'],
     cashierName: string,
     cashGiven?: number,
@@ -594,17 +599,22 @@ class PosDatabase {
     currencyUsed: Transaction['currencyUsed'] = 'primary',
     cashGivenSecondary?: number,
     changeDueSecondary?: number,
-    secondaryTotal?: number
+    secondaryTotal?: number,
+    discountMeta?: { type: 'amount' | 'percent'; value: number }
   ): Transaction {
     const now = new Date();
     const dateStr = `${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}`;
     const txNum = Math.floor(100 + Math.random() * 900);
 
-    const txItems: TransactionItem[] = items.map(({ item, quantity }) => {
+    const txItems: TransactionItem[] = items.map(({ item, quantity, isDamaged, damageDiscountPercent }) => {
       const vendor = this.getVendorById(item.vendorId);
       const isConsignment = vendor?.supplierType === 'consignment';
 
-      const totalPrice = item.retailPrice * quantity;
+      const grossTotal = item.retailPrice * quantity;
+      const lineDamagePct =
+        isDamaged ? Math.min(100, Math.max(0, damageDiscountPercent ?? 50)) : 0;
+      const totalPrice = Number((grossTotal * (1 - lineDamagePct / 100)).toFixed(2));
+      const lineDiscountAmount = Number((grossTotal - totalPrice).toFixed(2));
       const vatRate = item.vatRate ?? this.settings.defaultVatRate;
       const vatAmount = Number((totalPrice * vatRate).toFixed(2));
 
@@ -642,10 +652,19 @@ class PosDatabase {
         costBasis: item.costBasis,
         vendorPayoutAmount: Number(vendorPayout.toFixed(2)),
         houseProfitAmount: Number(houseProfit.toFixed(2)),
+        isDamaged: isDamaged || undefined,
+        damageDiscountPercent: lineDamagePct > 0 ? lineDamagePct : undefined,
+        discountAmount: lineDiscountAmount > 0 ? lineDiscountAmount : undefined,
       };
     });
 
-    const subtotal = txItems.reduce((acc, curr) => acc + curr.totalPrice, 0) - discountAmount;
+    const itemDiscountTotal = Number(
+      txItems.reduce((acc, curr) => acc + (curr.discountAmount || 0), 0).toFixed(2)
+    );
+    const subtotal = Math.max(
+      0,
+      Number(txItems.reduce((acc, curr) => acc + curr.totalPrice, 0).toFixed(2)) - discountAmount
+    );
     const vatTotal = Number(txItems.reduce((acc, curr) => acc + curr.vatAmount, 0).toFixed(2));
     const total = Number((subtotal + vatTotal).toFixed(2));
 
@@ -676,6 +695,11 @@ class PosDatabase {
       vatTotal,
       tax: vatTotal,
       discount: discountAmount,
+      discountType: (discountAmount > 0 || itemDiscountTotal > 0)
+        ? (discountMeta?.type ?? 'amount')
+        : undefined,
+      discountValue: discountMeta?.value,
+      itemDiscountTotal: itemDiscountTotal > 0 ? itemDiscountTotal : undefined,
       total,
       paymentMethod,
       cashGiven: cashGiven,

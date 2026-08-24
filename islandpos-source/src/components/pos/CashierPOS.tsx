@@ -40,6 +40,8 @@ interface CashierPOSProps {
 interface CartItem {
   item: InventoryItem;
   quantity: number;
+  isDamaged: boolean;
+  damageDiscountPercent: number; // whole number, e.g. 50 => 50% off this line
 }
 
 export const CashierPOS: React.FC<CashierPOSProps> = ({
@@ -63,7 +65,9 @@ export const CashierPOS: React.FC<CashierPOSProps> = ({
     posDb.updateSettings({ posViewMode: mode });
   };
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [discountAmount, setDiscountAmount] = useState<number>(0);
+  // Order-level discount: entered either as a fixed amount or a percentage of the subtotal
+  const [discountType, setDiscountType] = useState<'amount' | 'percent'>('amount');
+  const [discountValue, setDiscountValue] = useState<number>(0);
   const [heldCart, setHeldCart] = useState<CartItem[] | null>(null);
 
   // Attached Customer State
@@ -165,46 +169,65 @@ export const CashierPOS: React.FC<CashierPOSProps> = ({
     }
   };
 
+  // Totals Math — shared by the register tape, checkout modal and customer display.
+  // Per-item damaged markdowns are applied first; the order-level discount
+  // (percentage or fixed amount) is then applied to the remaining subtotal.
+  const rawSubtotal = cart.reduce(
+    (acc, c) => acc + c.item.retailPrice * c.quantity,
+    0
+  );
+  const itemDiscountTotal = Number(
+    cart
+      .reduce((acc, c) => {
+        const pct = c.isDamaged ? c.damageDiscountPercent : 0;
+        return acc + (c.item.retailPrice * c.quantity * pct) / 100;
+      }, 0)
+      .toFixed(2)
+  );
+  const afterItemSubtotal = rawSubtotal - itemDiscountTotal;
+  const requestedDiscount =
+    discountType === 'percent'
+      ? (afterItemSubtotal * (discountValue || 0)) / 100
+      : discountValue || 0;
+  const discountAmount = Math.max(0, Math.min(requestedDiscount, afterItemSubtotal));
+  const netSubtotal = Math.max(0, afterItemSubtotal - discountAmount);
+
+  // Calculate per-item VAT proportionally against the discounted net subtotal
+  const vatTotal = cart.reduce((acc, c) => {
+    const itemVatRate = c.item.vatRate ?? vatRate;
+    const itemPriceAfterDiscountRatio = rawSubtotal > 0 ? netSubtotal / rawSubtotal : 1;
+    const effectiveItemTotal = c.item.retailPrice * c.quantity * itemPriceAfterDiscountRatio;
+    return acc + effectiveItemTotal * itemVatRate;
+  }, 0);
+  const roundedVat = Number(vatTotal.toFixed(2));
+  const grandTotal = Number((netSubtotal + roundedVat).toFixed(2));
+
   // Sync Customer Secondary Display
   useEffect(() => {
-    const netSubtotal = Math.max(
-      0,
-      cart.reduce((acc, c) => acc + c.item.retailPrice * c.quantity, 0) - discountAmount
-    );
-    
-    // Calculate total VAT
-    const tax = Math.max(
-      0,
-      Number(
-        cart
-          .reduce(
-            (acc, c) =>
-              acc + c.item.retailPrice * c.quantity * (c.item.vatRate ?? vatRate),
-            0
-          )
-          .toFixed(2)
-      )
-    );
-    const total = Math.max(0, Number((netSubtotal + tax).toFixed(2)));
     const secondarySubtotal = Number((netSubtotal / exchangeRate).toFixed(2));
-    const secondaryTax = Number((tax / exchangeRate).toFixed(2));
+    const secondaryTax = Number((roundedVat / exchangeRate).toFixed(2));
 
     const lastItem = cart.length > 0 ? cart[cart.length - 1].item : undefined;
 
     customerChannel.updateState({
-      cartItems: cart.map((c) => ({
-        id: c.item.id,
-        name: c.item.name,
-        brand: c.item.brand,
-        quantity: c.quantity,
-        unitPrice: c.item.retailPrice,
-        totalPrice: c.item.retailPrice * c.quantity,
-        secondaryUnitPrice: c.item.retailPriceSecondary || (c.item.retailPrice / exchangeRate),
-        secondaryTotalPrice: (c.item.retailPriceSecondary || (c.item.retailPrice / exchangeRate)) * c.quantity,
-      })),
+      cartItems: cart.map((c) => {
+        const effectiveUnitPrice = c.isDamaged
+          ? c.item.retailPrice * (1 - c.damageDiscountPercent / 100)
+          : c.item.retailPrice;
+        return {
+          id: c.item.id,
+          name: c.item.name,
+          brand: c.item.brand,
+          quantity: c.quantity,
+          unitPrice: effectiveUnitPrice,
+          totalPrice: effectiveUnitPrice * c.quantity,
+          secondaryUnitPrice: effectiveUnitPrice / exchangeRate,
+          secondaryTotalPrice: (effectiveUnitPrice / exchangeRate) * c.quantity,
+        };
+      }),
       subtotal: netSubtotal,
-      tax,
-      total,
+      tax: roundedVat,
+      total: grandTotal,
       isCheckingOut: isCheckoutOpen,
       displayCurrency: settings.defaultCurrencyMode === 'secondary' ? 'secondary' : 'primary',
       secondarySubtotal,
@@ -219,7 +242,7 @@ export const CashierPOS: React.FC<CashierPOSProps> = ({
           }
         : undefined,
     });
-  }, [cart, discountAmount, isCheckoutOpen, vatRate, settings.defaultCurrencyMode, exchangeRate]);
+  }, [cart, netSubtotal, roundedVat, grandTotal, isCheckoutOpen, settings.defaultCurrencyMode, exchangeRate]);
 
   // Cart Handlers
   const handleAddToCart = (item: InventoryItem) => {
@@ -234,7 +257,7 @@ export const CashierPOS: React.FC<CashierPOSProps> = ({
             : c
         );
       }
-      return [...prevCart, { item, quantity: 1 }];
+      return [...prevCart, { item, quantity: 1, isDamaged: false, damageDiscountPercent: 50 }];
     });
   };
 
@@ -257,6 +280,23 @@ export const CashierPOS: React.FC<CashierPOSProps> = ({
     setCart((prevCart) => prevCart.filter((c) => c.item.id !== itemId));
   };
 
+  // Per-item damaged goods markdown
+  const handleToggleDamaged = (itemId: string) => {
+    setCart((prevCart) =>
+      prevCart.map((c) => (c.item.id === itemId ? { ...c, isDamaged: !c.isDamaged } : c))
+    );
+  };
+
+  const handleSetDamagePercent = (itemId: string, pct: number) => {
+    setCart((prevCart) =>
+      prevCart.map((c) =>
+        c.item.id === itemId
+          ? { ...c, damageDiscountPercent: Math.min(100, Math.max(0, pct || 0)) }
+          : c
+      )
+    );
+  };
+
   const handleScanSku = (sku: string) => {
     const item = inventory.find(
       (i) => i.sku.toLowerCase() === sku.toLowerCase() || i.id.toLowerCase() === sku.toLowerCase()
@@ -268,14 +308,16 @@ export const CashierPOS: React.FC<CashierPOSProps> = ({
 
   const handleClearCart = () => {
     setCart([]);
-    setDiscountAmount(0);
+    setDiscountValue(0);
+    setDiscountType('amount');
   };
 
   const handleHoldCart = () => {
     if (cart.length === 0) return;
     setHeldCart(cart);
     setCart([]);
-    setDiscountAmount(0);
+    setDiscountValue(0);
+    setDiscountType('amount');
   };
 
   const handleRecallCart = () => {
@@ -283,24 +325,6 @@ export const CashierPOS: React.FC<CashierPOSProps> = ({
     setCart(heldCart);
     setHeldCart(null);
   };
-
-  // Math totals
-  const rawSubtotal = cart.reduce(
-    (acc, c) => acc + c.item.retailPrice * c.quantity,
-    0
-  );
-  const netSubtotal = Math.max(0, rawSubtotal - discountAmount);
-  
-  // Calculate per-item VAT
-  const vatTotal = cart.reduce((acc, c) => {
-    const itemVatRate = c.item.vatRate ?? vatRate;
-    const itemPriceAfterDiscountRatio = rawSubtotal > 0 ? netSubtotal / rawSubtotal : 1;
-    const effectiveItemTotal = c.item.retailPrice * c.quantity * itemPriceAfterDiscountRatio;
-    return acc + effectiveItemTotal * itemVatRate;
-  }, 0);
-
-  const roundedVat = Number(vatTotal.toFixed(2));
-  const grandTotal = Number((netSubtotal + roundedVat).toFixed(2));
 
   return (
     <div className="space-y-4">
@@ -718,9 +742,13 @@ export const CashierPOS: React.FC<CashierPOSProps> = ({
                   </p>
                 </div>
               ) : (
-                cart.map(({ item, quantity }) => {
+                cart.map((cartLine) => {
+                  const { item, quantity, isDamaged, damageDiscountPercent } = cartLine;
                   const vendor = posDb.getVendorById(item.vendorId);
                   const isConsignment = vendor?.supplierType === 'consignment';
+                  const effectiveUnitPrice = isDamaged
+                    ? item.retailPrice * (1 - damageDiscountPercent / 100)
+                    : item.retailPrice;
 
                   return (
                     <div
@@ -748,6 +776,36 @@ export const CashierPOS: React.FC<CashierPOSProps> = ({
                             <span className="text-amber-400 font-semibold">(Deposit)</span>
                           )}
                         </div>
+
+                        {/* Damaged Goods Discount Control */}
+                        <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
+                          <button
+                            onClick={() => handleToggleDamaged(item.id)}
+                            className={`px-1.5 py-0.5 rounded text-[9px] font-bold border transition-colors ${
+                              isDamaged
+                                ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                                : 'bg-slate-800/60 text-slate-400 border-slate-700 hover:text-slate-200'
+                            }`}
+                            title={isDamaged ? 'Remove damaged discount' : 'Mark as damaged to apply a discount'}
+                          >
+                            {isDamaged ? `⚠ DAMAGED −${damageDiscountPercent}%` : '⚠ Mark Damaged'}
+                          </button>
+                          {isDamaged && (
+                            <>
+                              <input
+                                type="number"
+                                min="0"
+                                max="100"
+                                value={damageDiscountPercent}
+                                onChange={(e) =>
+                                  handleSetDamagePercent(item.id, parseInt(e.target.value, 10) || 0)
+                                }
+                                className="w-12 bg-[#161B22] border border-amber-500/40 rounded px-1 py-0.5 text-right text-[10px] text-amber-300 font-mono focus:outline-none focus:border-amber-400"
+                              />
+                              <span className="text-[9px] text-amber-400 font-bold">% OFF</span>
+                            </>
+                          )}
+                        </div>
                       </div>
 
                       {/* Qty Controls */}
@@ -769,7 +827,12 @@ export const CashierPOS: React.FC<CashierPOSProps> = ({
                         </button>
 
                         <div className="text-right w-16 font-mono text-xs font-bold text-emerald-400">
-                          {primarySymbol} {(item.retailPrice * quantity).toFixed(2)}
+                          {primarySymbol} {(effectiveUnitPrice * quantity).toFixed(2)}
+                          {isDamaged && (
+                            <span className="block text-[9px] text-amber-400 line-through opacity-70">
+                              {primarySymbol} {(item.retailPrice * quantity).toFixed(2)}
+                            </span>
+                          )}
                         </div>
 
                         <button
@@ -788,21 +851,80 @@ export const CashierPOS: React.FC<CashierPOSProps> = ({
 
           {/* Cart Bottom Summary & Checkout */}
           <div className="pt-3 border-t border-[#1E293B] space-y-2">
-            {/* Inline Discount Control */}
+            {/* Order-Level Discount Control: Percentage or Fixed Amount */}
             {cart.length > 0 && (
-              <div className="flex items-center justify-between gap-2 text-xs">
-                <span className="text-slate-400 flex items-center gap-1">
-                  <Tag className="w-3.5 h-3.5 text-amber-400" /> Custom Discount ({primarySymbol}):
-                </span>
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={discountAmount || ''}
-                  onChange={(e) => setDiscountAmount(Math.max(0, parseFloat(e.target.value) || 0))}
-                  placeholder="0.00"
-                  className="w-20 bg-[#0F1115] border border-[#1E293B] rounded px-2 py-1 text-right text-xs text-amber-300 font-mono focus:outline-none focus:border-amber-500"
-                />
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between gap-2 text-xs">
+                  <span className="text-slate-400 flex items-center gap-1">
+                    <Tag className="w-3.5 h-3.5 text-amber-400" /> Discount
+                  </span>
+                  <div className="flex items-center gap-1">
+                    {/* Type Toggle */}
+                    <div className="flex bg-[#0F1115] border border-[#1E293B] rounded-lg p-0.5">
+                      <button
+                        type="button"
+                        onClick={() => setDiscountType('percent')}
+                        className={`px-2 py-0.5 rounded-md text-[10px] font-bold transition-colors ${
+                          discountType === 'percent'
+                            ? 'bg-amber-600 text-white'
+                            : 'text-slate-400 hover:text-slate-200'
+                        }`}
+                        title="Discount as a percentage of subtotal"
+                      >
+                        %
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDiscountType('amount')}
+                        className={`px-2 py-0.5 rounded-md text-[10px] font-bold transition-colors ${
+                          discountType === 'amount'
+                            ? 'bg-amber-600 text-white'
+                            : 'text-slate-400 hover:text-slate-200'
+                        }`}
+                        title={`Discount as a fixed amount (${primaryCode})`}
+                      >
+                        {primarySymbol}
+                      </button>
+                    </div>
+                    <input
+                      type="number"
+                      min="0"
+                      max={discountType === 'percent' ? 100 : undefined}
+                      step={discountType === 'percent' ? '1' : '0.01'}
+                      value={discountValue || ''}
+                      onChange={(e) => {
+                        const v = parseFloat(e.target.value) || 0;
+                        setDiscountValue(
+                          discountType === 'percent' ? Math.min(100, Math.max(0, v)) : Math.max(0, v)
+                        );
+                      }}
+                      placeholder={discountType === 'percent' ? '0' : '0.00'}
+                      className="w-16 bg-[#0F1115] border border-[#1E293B] rounded px-2 py-1 text-right text-xs text-amber-300 font-mono focus:outline-none focus:border-amber-500"
+                    />
+                    <span className="text-[10px] text-slate-400 font-bold w-4">
+                      {discountType === 'percent' ? '%' : primarySymbol}
+                    </span>
+                  </div>
+                </div>
+                {/* Quick Percent Shortcuts (only in % mode) */}
+                {discountType === 'percent' && (
+                  <div className="flex items-center justify-end gap-1">
+                    {[5, 10, 15, 20, 25, 50].map((pct) => (
+                      <button
+                        key={pct}
+                        type="button"
+                        onClick={() => setDiscountValue(pct)}
+                        className={`px-1.5 py-0.5 rounded border text-[9px] font-bold font-mono transition-colors ${
+                          discountValue === pct
+                            ? 'bg-amber-600 text-white border-amber-600'
+                            : 'bg-[#0F1115] text-slate-400 border-[#1E293B] hover:text-amber-300 hover:border-amber-500/50'
+                        }`}
+                      >
+                        {pct}%
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
@@ -811,9 +933,17 @@ export const CashierPOS: React.FC<CashierPOSProps> = ({
                 <span>Net Subtotal</span>
                 <span className="font-mono">{primarySymbol} {netSubtotal.toFixed(2)}</span>
               </div>
+              {itemDiscountTotal > 0 && (
+                <div className="flex justify-between text-amber-500/90">
+                  <span>Damaged Item Discounts</span>
+                  <span className="font-mono">-{primarySymbol} {itemDiscountTotal.toFixed(2)}</span>
+                </div>
+              )}
               {discountAmount > 0 && (
                 <div className="flex justify-between text-amber-400">
-                  <span>Discount</span>
+                  <span>
+                    Order Discount{discountType === 'percent' ? ` (${discountValue || 0}%)` : ''}
+                  </span>
                   <span className="font-mono">-{primarySymbol} {discountAmount.toFixed(2)}</span>
                 </div>
               )}
@@ -828,16 +958,7 @@ export const CashierPOS: React.FC<CashierPOSProps> = ({
                   <span>Grand Total</span>
                   {settings.allowPaymentInSecondary !== false && (
                     <span className="block text-[10px] text-cyan-400 font-mono font-medium mt-0.5">
-                      Or equivalent: {secondarySymbol}{
-                        (
-                          cart.reduce((sum, c) => {
-                            const unitSec = c.item.retailPriceSecondary && c.item.retailPriceSecondary > 0
-                              ? c.item.retailPriceSecondary
-                              : (c.item.retailPrice / exchangeRate);
-                            return sum + (unitSec * c.quantity);
-                          }, 0) + (roundedVat / exchangeRate) - (discountAmount / exchangeRate)
-                        ).toFixed(2)
-                      } {secondaryCode}
+                      Or equivalent: {secondarySymbol}{(grandTotal / exchangeRate).toFixed(2)} {secondaryCode}
                     </span>
                   )}
                 </div>
@@ -864,13 +985,16 @@ export const CashierPOS: React.FC<CashierPOSProps> = ({
           subtotal={netSubtotal}
           tax={roundedVat}
           discount={discountAmount}
+          discountType={discountType}
+          discountValue={discountValue}
           total={grandTotal}
           attachedCustomer={attachedCustomer}
           onClose={() => setIsCheckoutOpen(false)}
           onCompleteTransaction={(tx) => {
             setIsCheckoutOpen(false);
             setCart([]);
-            setDiscountAmount(0);
+            setDiscountValue(0);
+            setDiscountType('amount');
             setCompletedTransaction(tx);
             onRefreshData();
           }}

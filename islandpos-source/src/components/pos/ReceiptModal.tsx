@@ -169,6 +169,11 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
                   <div className="flex justify-between font-semibold">
                     <span className="truncate pr-2">
                       [{item.brand || 'Ocean'}] {item.name}
+                      {item.isDamaged && (
+                        <span className="ml-1 align-middle inline-block text-[8px] bg-amber-100 text-amber-800 border border-amber-300 px-1 rounded font-bold uppercase tracking-wide">
+                          Damaged −{item.damageDiscountPercent ?? 0}%
+                        </span>
+                      )}
                     </span>
                     <span className={item.totalPrice < 0 ? 'text-rose-700 font-bold' : ''}>
                       {primarySymbol} {item.totalPrice.toFixed(2)}
@@ -194,9 +199,15 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
               <span>Subtotal (Net):</span>
               <span>{primarySymbol} {transaction.subtotal.toFixed(2)}</span>
             </div>
+            {!!transaction.itemDiscountTotal && transaction.itemDiscountTotal > 0 && (
+              <div className="flex justify-between text-amber-700">
+                <span>Item Discounts (Damaged):</span>
+                <span>-{primarySymbol} {transaction.itemDiscountTotal.toFixed(2)}</span>
+              </div>
+            )}
             {transaction.discount > 0 && (
               <div className="flex justify-between text-rose-600">
-                <span>Discount:</span>
+                <span>Discount{transaction.discountType === 'percent' ? ' (%)' : ''}:</span>
                 <span>-{primarySymbol} {transaction.discount.toFixed(2)}</span>
               </div>
             )}

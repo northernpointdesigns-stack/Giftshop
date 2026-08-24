@@ -56,6 +56,10 @@ export interface TransactionItem {
   costBasis: number; // Snapshot of cost basis at time of sale
   vendorPayoutAmount: number; // Snapshot of payout owed to vendor
   houseProfitAmount: number; // Snapshot of house retainment
+  // Per-line discount snapshot (e.g., damaged goods markdown applied by cashier)
+  isDamaged?: boolean;
+  damageDiscountPercent?: number; // e.g. 50 means 50% off this line
+  discountAmount?: number; // Amount deducted from this line's gross total
 }
 
 export type PaymentMethod = 'cash' | 'card' | 'split' | 'gift_card';
@@ -79,7 +83,10 @@ export interface Transaction {
   subtotal: number; // Net amount before VAT & discount
   vatTotal: number; // VAT tax collected
   tax: number; // Same as vatTotal
-  discount: number;
+  discount: number; // Final order-level discount amount actually deducted
+  discountType?: 'amount' | 'percent'; // How the order-level discount was entered
+  discountValue?: number; // Raw entered order-level discount value (% or amount)
+  itemDiscountTotal?: number; // Sum of per-item discounts (damaged markdowns) before order-level discount
   total: number;
   paymentMethod: PaymentMethod;
   cashGiven?: number;
