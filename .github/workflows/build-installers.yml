@@ -1,20 +1,25 @@
-name: Build Standalone Desktop & Mobile Apps
+name: Build BoutiquePOS Installers
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main ]
+    tags: [ 'v*' ]
   pull_request:
-    branches: [ main, master ]
-  workflow_dispatch: # Allows manual trigger from GitHub Actions tab
+    branches: [ main ]
+  workflow_dispatch: # Allows manual trigger from the GitHub Actions tab
 
 jobs:
-  # Job 1: Build Desktop Apps (macOS for Apple Silicon M1/M2/M3 & Intel, and Windows x64)
   build-desktop:
-    name: Build Desktop Apps (${{ matrix.os }})
+    name: Build ${{ matrix.os }} installer
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        os: [macos-latest, windows-latest]
+        os: [macos-latest, windows-latest, ubuntu-latest]
+
+    defaults:
+      run:
+        working-directory: app-source
 
     steps:
       - name: Checkout Code
@@ -28,88 +33,48 @@ jobs:
       - name: Install Dependencies
         run: npm install
 
-      - name: Build React Web App
+      - name: Verify Web Bundle
         run: npm run build
 
-      # macOS Build (M1 onwards uses arm64, and Intel uses x64)
-      - name: Compile & Package Mac App (.dmg & .zip)
+      - name: Build macOS App (.dmg & .zip)
         if: matrix.os == 'macos-latest'
-        run: |
-          npm run electron:build:mac
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run electron:build:mac
 
-      # Windows Build (.exe)
-      - name: Compile & Package Windows App (.exe)
+      - name: Build Windows Installer (.exe)
         if: matrix.os == 'windows-latest'
-        run: |
-          npm run electron:build:win
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run electron:build:win
 
-      # Upload Desktop Installers
-      - name: Upload Desktop Artifacts
+      - name: Build Linux AppImage & Snap
+        if: matrix.os == 'ubuntu-latest'
+        run: npm run electron:build:linux
+
+      - name: Upload Installer Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Ocean-POS-Desktop-${{ matrix.os }}
+          name: BoutiquePOS-${{ matrix.os }}
           path: |
-            dist-desktop/*.dmg
-            dist-desktop/*.zip
-            dist-desktop/*.exe
+            app-source/dist-desktop/*.dmg
+            app-source/dist-desktop/*.zip
+            app-source/dist-desktop/*.exe
+            app-source/dist-desktop/*.AppImage
+            app-source/dist-desktop/*.snap
+            app-source/dist-desktop/snap/**/*.snap
           if-no-files-found: error
 
-  # Job 2: Build Android App (APK & AAB via Capacitor)
-  build-android:
-    name: Build Android App (.apk)
+  # Creates a GitHub Release with all installers attached when you push a tag like v1.0.0
+  release:
+    name: Publish Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build-desktop
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Setup Java JDK 17
-        uses: actions/setup-java@v4
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v4
         with:
-          distribution: 'zulu'
-          java-version: '17'
+          merge-multiple: true
+          path: release-assets
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Attach Installers to GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          node-version: 20
-
-      - name: Install Dependencies
-        run: npm install
-
-      - name: Build React Web App
-        run: npm run build
-
-      - name: Install Capacitor Android Platform
-        run: |
-          npx cap init "Ocean POS" "com.oceanpos.app" --web-dir dist || true
-          npx cap add android
-
-      - name: Sync Web Assets to Android
-        run: npx cap sync android
-
-      - name: Grant Gradle Permissions
-        run: chmod +x android/gradlew
-
-      - name: Compile Debug APK
-        run: cd android && ./gradlew assembleDebug
-
-      - name: Compile Release Unsigned APK
-        run: cd android && ./gradlew assembleRelease
-
-      # Upload compiled Android APK
-      - name: Upload Android APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: Ocean-POS-Android-Build
-          path: |
-            android/app/build/outputs/apk/debug/app-debug.apk
-            android/app/build/outputs/apk/release/app-release-unsigned.apk
-          if-no-files-found: error
+          files: release-assets/*
