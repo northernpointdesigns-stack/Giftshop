@@ -1,4 +1,5 @@
 name: Build Gift Shop POS Releases
+# Build from the committed POS project root.
 
 on:
   push:

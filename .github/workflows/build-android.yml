@@ -1,4 +1,5 @@
 name: Build Gift Shop POS Android APK
+# Build from the committed POS project root.
 
 on:
   push:
