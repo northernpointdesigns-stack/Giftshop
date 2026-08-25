@@ -116,9 +116,10 @@ jobs:
       - name: Build unsigned simulator app
         run: >-
           xcodebuild
-          -workspace ios/App/App.xcworkspace
+          -project ios/App/App.xcodeproj
           -scheme App
           -sdk iphonesimulator
+          -destination 'generic/platform=iOS Simulator'
           -configuration Debug
           -derivedDataPath ios/build
           CODE_SIGNING_ALLOWED=NO
