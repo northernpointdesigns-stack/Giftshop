@@ -1,4 +1,4 @@
-import { generateLicenseKey, verifyLicense, activateLicense } from '/Users/alangouffe/Desktop/pos/island-pos-extracted/src/services/license';
+import { generateLicenseKey, verifyLicense, activateLicense } from '../src/services/license';
 
 (async () => {
   const email = 'jane@beachshop.sc';
