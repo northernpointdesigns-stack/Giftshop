@@ -1,5 +1,6 @@
 name: Build Gift Shop POS Android APK
 # Build from the committed POS project root.
+# This workflow intentionally runs independently from desktop releases.
 
 on:
   push:
