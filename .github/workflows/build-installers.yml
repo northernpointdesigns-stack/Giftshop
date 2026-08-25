@@ -87,23 +87,31 @@ jobs:
           security list-keychains -d user -s "$KEYCHAIN_PATH"
           security default-keychain -s "$KEYCHAIN_PATH"
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          echo "CSC_LINK=$CERT_PATH" >> "$GITHUB_ENV"
 
       - name: Build Windows installer
-        if: matrix.platform == 'win'
+        if: matrix.platform == 'win' && env.RELEASE_BUILD == 'false'
+        run: npx electron-builder --win nsis --publish never
+
+      - name: Build signed Windows installer
+        if: matrix.platform == 'win' && env.RELEASE_BUILD == 'true'
         env:
           CSC_LINK: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
           CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
-        run: npx electron-builder --win nsis
+        run: npx electron-builder --win nsis --publish never
 
       - name: Build macOS installer
-        if: matrix.platform == 'mac'
+        if: matrix.platform == 'mac' && env.RELEASE_BUILD == 'false'
+        run: npx electron-builder --mac dmg zip --arm64 --publish never
+
+      - name: Build signed macOS installer
+        if: matrix.platform == 'mac' && env.RELEASE_BUILD == 'true'
         env:
-          CSC_LINK: ${{ env.RELEASE_BUILD == 'true' && format('{0}/macos-signing.p12', runner.temp) || '' }}
           CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: npx electron-builder --mac dmg zip --arm64
+        run: npx electron-builder --mac dmg zip --arm64 --publish never
 
       - name: Upload desktop installer
         uses: actions/upload-artifact@v4
