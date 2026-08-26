@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { calculateCartTotals, computeOrderVerification, computeTouristRefund, resolveTransactionVat } from '../utils/currencyAndMath';
 import type { InventoryItem } from '../types/pos';
+import { calculateCartTotals, computeOrderVerification, computeTouristRefund, resolveTransactionVat } from '../utils/currencyAndMath';
 
 const item = {
   id: 'i1',

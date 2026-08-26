@@ -43,6 +43,7 @@ import { RefundModal } from './RefundModal';
 import { CustomerLookupModal } from './CustomerLookupModal';
 import { ReceiptLookupModal } from '../receipts/ReceiptLookupModal';
 import { ManagerPinGateModal } from '../auth/ManagerPinGateModal';
+import { RegisterSnapshot, loadRegisterSnapshot, saveRegisterSnapshot } from '../../services/registerSnapshot';
 
 interface CashierPOSProps {
   inventory: InventoryItem[];
@@ -98,7 +99,14 @@ export const CashierPOS: React.FC<CashierPOSProps> = ({
   const [selectedBrand, setSelectedBrand] = useState<string>('All');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [cart, setCart] = useState<CartItem[]>([]);
+
+  // Durable working basket: restored from the per-register snapshot so the
+  // register survives navigating to other tabs (settings, inventory, reports)
+  // and even an app crash. Lines are validated against live inventory.
+  const [initialSnapshot] = useState<RegisterSnapshot | null>(() =>
+    loadRegisterSnapshot(activeRegisterId, inventory)
+  );
+  const [cart, setCart] = useState<CartItem[]>(initialSnapshot?.cart ?? []);
 
   // Synchronize cart item unit prices when the active pricing tier list changes
   useEffect(() => {
@@ -150,12 +158,46 @@ export const CashierPOS: React.FC<CashierPOSProps> = ({
   const lastScanTimeRef = useRef<{ itemId: string; time: number }>({ itemId: '', time: 0 });
 
   // Order-level discount: entered either as a fixed amount or a percentage of the subtotal
-  const [discountType, setDiscountType] = useState<'amount' | 'percent'>('amount');
-  const [discountValue, setDiscountValue] = useState<number>(0);
-  const [heldCart, setHeldCart] = useState<CartItem[] | null>(null);
+  const [discountType, setDiscountType] = useState<'amount' | 'percent'>(
+    initialSnapshot?.discountType ?? 'amount'
+  );
+  const [discountValue, setDiscountValue] = useState<number>(initialSnapshot?.discountValue ?? 0);
+  const [heldCart, setHeldCart] = useState<CartItem[] | null>(initialSnapshot?.heldCart ?? null);
 
   // Attached Customer State
-  const [attachedCustomer, setAttachedCustomer] = useState<Customer | null>(null);
+  const [attachedCustomer, setAttachedCustomer] = useState<Customer | null>(
+    initialSnapshot?.attachedCustomer ?? null
+  );
+
+  // --- Basket persistence -----------------------------------------------
+  // Declared BEFORE the register-switch effect so that, on the render where
+  // the register changes, the outgoing basket is written under its OWN
+  // register key before the incoming one is loaded.
+  const snapshotRegisterRef = useRef(activeRegisterId);
+
+  useEffect(() => {
+    saveRegisterSnapshot(snapshotRegisterRef.current, {
+      cart,
+      discountType,
+      discountValue,
+      heldCart,
+      attachedCustomer,
+      savedAt: Date.now(),
+    });
+  }, [cart, discountType, discountValue, heldCart, attachedCustomer]);
+
+  // Switching registers swaps to that register's own saved basket.
+  useEffect(() => {
+    if (snapshotRegisterRef.current === activeRegisterId) return;
+    snapshotRegisterRef.current = activeRegisterId;
+    const snap = loadRegisterSnapshot(activeRegisterId, inventory);
+    setCart(snap?.cart ?? []);
+    setDiscountType(snap?.discountType ?? 'amount');
+    setDiscountValue(snap?.discountValue ?? 0);
+    setHeldCart(snap?.heldCart ?? null);
+    setAttachedCustomer(snap?.attachedCustomer ?? null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeRegisterId]);
 
   // Offline Service Worker Sync Status
   const [offlineStatus, setOfflineStatus] = useState<OfflineSyncStatus>(offlineSyncEngine.getStatus());
