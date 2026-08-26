@@ -3,11 +3,8 @@ name: Build Gift Shop POS Android APK
 # This workflow intentionally runs independently from desktop releases.
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'island-pos-extracted/**'
-      - '.github/workflows/build-android.yml'
+  # Manual builds only — Actions minutes are only consumed when you click
+  # "Run workflow". Pushing to main no longer triggers anything.
   workflow_dispatch:
 
 # Unlock flag: set repo VARIABLE VITE_DISABLE_LICENSE=1 (Settings → Secrets

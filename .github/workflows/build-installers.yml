@@ -2,12 +2,11 @@ name: Build Gift Shop POS Releases
 # Build from the committed POS project root.
 
 on:
-  push:
-    branches: [main]
-    tags: ['v*']
-  pull_request:
-    branches: [main]
+  # Manual builds only — Actions minutes are only consumed when you click
+  # "Run workflow". Pushing a v* tag also produces a release build.
   workflow_dispatch:
+  push:
+    tags: ['v*']
 
 permissions:
   contents: write
