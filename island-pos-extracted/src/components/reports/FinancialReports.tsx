@@ -2,6 +2,10 @@ import React, { useState } from 'react';
 import {
   TrendingUp,
   PieChart,
+  ChartLine,
+  ChartPie,
+  ChartColumn,
+  List,
   DollarSign,
   Layers,
   Printer,
@@ -16,6 +20,9 @@ import {
 } from 'lucide-react';
 import { Transaction, InventoryItem, Vendor } from '../../types/pos';
 import { posDb } from '../../services/db';
+import { AnimatedAreaChart, ChartPoint } from './charts/AnimatedAreaChart';
+import { AnimatedDonut } from './charts/AnimatedDonut';
+import { AnimatedBarChart } from './charts/AnimatedBarChart';
 
 interface FinancialReportsProps {
   transactions: Transaction[];
@@ -27,6 +34,22 @@ export const FinancialReports: React.FC<FinancialReportsProps> = ({
   transactions,
 }) => {
   const [cycle, setCycle] = useState<'today' | 'week' | 'month' | 'year' | 'all'>('today');
+  const [viewMode, setViewModeState] = useState<'numbers' | 'graphs' | 'pie'>(() => {
+    try {
+      const saved = localStorage.getItem('finreports.viewMode');
+      return saved === 'graphs' || saved === 'pie' ? saved : 'numbers';
+    } catch {
+      return 'numbers';
+    }
+  });
+  const setViewMode = (m: 'numbers' | 'graphs' | 'pie') => {
+    setViewModeState(m);
+    try {
+      localStorage.setItem('finreports.viewMode', m);
+    } catch {
+      /* storage unavailable — view simply won't persist */
+    }
+  };
 
   const settings = posDb.getSettings();
   const primarySymbol = settings.primaryCurrencySymbol || '$';
@@ -201,6 +224,44 @@ export const FinancialReports: React.FC<FinancialReportsProps> = ({
     .sort((a, b) => b[1].revenue - a[1].revenue)
     .slice(0, 6);
 
+  // ---- Live chart datasets (derived from the same filtered transactions) ----
+  const money = (v: number) => `${primarySymbol} ${v.toFixed(2)}`;
+
+  const revenueSeries: ChartPoint[] = (() => {
+    const buckets = new Map<string, { t: number; v: number }>();
+    filteredTx.forEach((tx) => {
+      const d = new Date(tx.timestamp);
+      const k =
+        cycle === 'today'
+          ? `${String(d.getHours()).padStart(2, '0')}:00`
+          : cycle === 'year' || cycle === 'all'
+            ? d.toLocaleDateString(undefined, { month: 'short', year: '2-digit' })
+            : d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+      const b = buckets.get(k) || { t: d.getTime(), v: 0 };
+      b.v += tx.total;
+      b.t = Math.min(b.t, d.getTime());
+      buckets.set(k, b);
+    });
+    return Array.from(buckets.entries())
+      .sort((a, b) => a[1].t - b[1].t)
+      .map(([label, b]) => ({ label, value: b.v }));
+  })();
+
+  const brandSeries: ChartPoint[] = Object.entries(brandMap)
+    .sort((a, b) => b[1].gross - a[1].gross)
+    .slice(0, 6)
+    .map(([name, d]) => ({ label: name, value: d.gross }));
+
+  const categorySeries: ChartPoint[] = Object.entries(categorySalesMap)
+    .sort((a, b) => b[1].revenue - a[1].revenue)
+    .slice(0, 8)
+    .map(([name, s]) => ({ label: name, value: s.revenue }));
+
+  const productLineSeries: ChartPoint[] = topProductLines.map(([name, s]) => ({
+    label: name,
+    value: s.revenue,
+  }));
+
   // Export CSV Report for Selected Cycle
   const handleExportCsv = () => {
     let csvStr = `Cycle Financial Performance Report (${cycle.toUpperCase()})\n`;
@@ -310,6 +371,31 @@ export const FinancialReports: React.FC<FinancialReportsProps> = ({
             >
               All Time
             </button>
+          </div>
+
+          {/* View Toggle: Numbers / Graphs / Pie */}
+          <div
+            className="flex bg-[#0F1115] p-1 rounded-xl border border-[#1E293B] text-xs font-medium"
+            role="tablist"
+            aria-label="Report view mode"
+          >
+            {([
+              ['numbers', 'Numbers', List],
+              ['graphs', 'Graphs', ChartLine],
+              ['pie', 'Pie', ChartPie],
+            ] as const).map(([mode, label, Icon]) => (
+              <button
+                key={mode}
+                onClick={() => setViewMode(mode)}
+                role="tab"
+                aria-selected={viewMode === mode}
+                className={`px-3 py-1 rounded-lg transition-colors flex items-center gap-1 ${
+                  viewMode === mode ? 'bg-cyan-600 text-white font-bold' : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Icon className="w-3 h-3" /> {label}
+              </button>
+            ))}
           </div>
 
           <button
@@ -423,7 +509,74 @@ export const FinancialReports: React.FC<FinancialReportsProps> = ({
         </div>
       )}
 
-      {/* Brand Performance Cards Grid */}
+      {/* Live Chart Views — Graphs / Pie */}
+      {viewMode === 'graphs' && (
+        <div className="space-y-4">
+          <div className="bg-[#161B22] border border-[#1E293B] rounded-xl p-5 shadow-sm">
+            <div className="flex items-center justify-between border-b border-[#1E293B] pb-2 mb-4">
+              <h3 className="font-bold text-sm text-[#E2E8F0] flex items-center gap-2">
+                <ChartLine className="w-4 h-4 text-emerald-400" /> Revenue Trend ({cycle.toUpperCase()})
+              </h3>
+              <span className="text-[10px] text-slate-400">Live — redraws with every sale</span>
+            </div>
+            {revenueSeries.length === 0 ? (
+              <p className="text-xs text-slate-500 py-10 text-center">No sales recorded for this cycle yet.</p>
+            ) : (
+              <AnimatedAreaChart data={revenueSeries} formatValue={money} />
+            )}
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="bg-[#161B22] border border-[#1E293B] rounded-xl p-5 shadow-sm space-y-4">
+              <h3 className="font-bold text-sm text-[#E2E8F0] flex items-center gap-2">
+                <ChartColumn className="w-4 h-4 text-cyan-400" /> Top Brands by Revenue
+              </h3>
+              {brandSeries.length === 0 ? (
+                <p className="text-xs text-slate-500 py-6 text-center">No sales recorded for this cycle yet.</p>
+              ) : (
+                <AnimatedBarChart data={brandSeries} color="#22d3ee" formatValue={money} />
+              )}
+            </div>
+            <div className="bg-[#161B22] border border-[#1E293B] rounded-xl p-5 shadow-sm space-y-4">
+              <h3 className="font-bold text-sm text-[#E2E8F0] flex items-center gap-2">
+                <ChartColumn className="w-4 h-4 text-emerald-400" /> Top Product Lines
+              </h3>
+              {productLineSeries.length === 0 ? (
+                <p className="text-xs text-slate-500 py-6 text-center">No sales recorded for this cycle yet.</p>
+              ) : (
+                <AnimatedBarChart data={productLineSeries} color="#34d399" formatValue={money} />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+      {viewMode === 'pie' && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="bg-[#161B22] border border-[#1E293B] rounded-xl p-5 shadow-sm">
+            <h3 className="font-bold text-sm text-[#E2E8F0] flex items-center gap-2 border-b border-[#1E293B] pb-2 mb-4">
+              <ChartPie className="w-4 h-4 text-cyan-400" /> Brand Sales Share ({cycle.toUpperCase()})
+            </h3>
+            {brandSeries.length === 0 ? (
+              <p className="text-xs text-slate-500 py-10 text-center">No sales recorded for this cycle yet.</p>
+            ) : (
+              <AnimatedDonut data={brandSeries} formatValue={money} centerLabel="Brand Total" />
+            )}
+          </div>
+          <div className="bg-[#161B22] border border-[#1E293B] rounded-xl p-5 shadow-sm">
+            <h3 className="font-bold text-sm text-[#E2E8F0] flex items-center gap-2 border-b border-[#1E293B] pb-2 mb-4">
+              <ChartPie className="w-4 h-4 text-emerald-400" /> Category Sales Share ({cycle.toUpperCase()})
+            </h3>
+            {categorySeries.length === 0 ? (
+              <p className="text-xs text-slate-500 py-10 text-center">No sales recorded for this cycle yet.</p>
+            ) : (
+              <AnimatedDonut data={categorySeries} formatValue={money} centerLabel="Category Total" />
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Brand Performance Cards Grid (Numbers view) */}
+      {viewMode === 'numbers' && (
+      <>
       <div className="bg-[#161B22] border border-[#1E293B] rounded-xl p-5 shadow-sm space-y-4">
         <div className="flex items-center justify-between border-b border-[#1E293B] pb-3">
           <h3 className="font-bold text-sm text-[#E2E8F0] flex items-center gap-2">
@@ -578,6 +731,8 @@ export const FinancialReports: React.FC<FinancialReportsProps> = ({
           )}
         </div>
       </div>
+      </>
+      )}
 
       {/* P&L Split & Category Breakdown */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -654,7 +809,8 @@ export const FinancialReports: React.FC<FinancialReportsProps> = ({
         </div>
       </div>
 
-      {/* Category Performance Breakdown */}
+      {/* Category Performance Breakdown (Numbers view) */}
+      {viewMode === 'numbers' && (
       <div className="bg-[#161B22] border border-[#1E293B] rounded-xl p-5 shadow-sm space-y-3">
         <h3 className="font-bold text-sm text-slate-200 flex items-center gap-2">
           <PieChart className="w-4 h-4 text-cyan-400" /> Revenue & Volume by Group Category ({cycle.toUpperCase()})
@@ -680,6 +836,7 @@ export const FinancialReports: React.FC<FinancialReportsProps> = ({
           ))}
         </div>
       </div>
+      )}
     </div>
   );
 };
