@@ -240,7 +240,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
                         {item.size ? `(${item.size})` : ''}
                       </span>
                       <span className="text-[9px] uppercase tracking-tight text-slate-500">
-                        VAT {( (item.vatRate || 0.15) * 100 ).toFixed(0)}%: {primarySymbol} {item.vatAmount?.toFixed(2) || '0.00'}
+                        VAT {( (item.vatRate || 0.15) * 100 ).toFixed(0)}%{settings.vatInclusive ? ' incl.' : ''}: {primarySymbol} {item.vatAmount?.toFixed(2) || '0.00'}
                       </span>
                     </div>
                   </div>
@@ -267,7 +267,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
                 </div>
               )}
               <div className="flex justify-between text-slate-700 font-semibold">
-                <span>VAT Tax Amount:</span>
+                <span>VAT Tax Amount{settings.vatInclusive ? ' (Included)' : ''}:</span>
                 <span>{primarySymbol} {(transaction.vatTotal || transaction.tax || 0).toFixed(2)}</span>
               </div>
               <div className={`flex justify-between font-bold text-sm pt-1 border-t border-slate-300 ${transaction.isRefund ? 'text-rose-700 font-sans' : 'text-slate-900'}`}>

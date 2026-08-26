@@ -101,14 +101,23 @@ export const auditReceiptTransaction = (
       computedVat += item.vatAmount;
     } else {
       const rate = item.vatRate ?? (storeSettings.defaultVatRate || 0.15);
-      computedVat += (item.totalPrice * rate);
+      if (storeSettings.vatInclusive) {
+        // Prices include VAT: extract the embedded tax portion
+        computedVat += Math.abs(item.totalPrice) - Math.abs(item.totalPrice) / (1 + rate);
+      } else {
+        computedVat += (item.totalPrice * rate);
+      }
     }
   });
 
   const orderDiscount = tx.discount || 0;
   const totalDiscounts = computedItemDiscounts + orderDiscount;
   const netSubtotal = computedSubtotal - totalDiscounts;
-  const computedTotal = Number((netSubtotal + computedVat).toFixed(2));
+  // Exclusive mode: total = net subtotal + VAT on top.
+  // Inclusive mode: line prices are gross, so the payable total IS the discounted sum.
+  const computedTotal = storeSettings.vatInclusive
+    ? Number(netSubtotal.toFixed(2))
+    : Number((netSubtotal + computedVat).toFixed(2));
   const recordedTotal = Number(Math.abs(tx.total).toFixed(2));
 
   const mathDelta = Math.abs(computedTotal - recordedTotal);

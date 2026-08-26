@@ -45,7 +45,7 @@ export interface CategoryConfig {
 
 export interface VatConfig {
   calculationMode: 'exclusive' | 'inclusive'; // 'exclusive' = CSV has Net Price (add VAT), 'inclusive' = CSV has Gross Price (extract VAT)
-  defaultVatRate: number; // e.g. 0.15 for 15% Seychelles VAT
+  defaultVatRate: number; // e.g. 0.15 for 15% VAT
   applyGlobalOverride: boolean;
 }
 

@@ -1116,7 +1116,7 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
                 }`}
               >
                 <Store className="w-3.5 h-3.5 text-emerald-400" />
-                <span>White Label Store Profile, Logo &amp; Seychelles VAT</span>
+                <span>White Label Store Profile, Logo &amp; VAT</span>
               </button>
             </>
           )}
@@ -3775,7 +3775,7 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
               <>
                 <div>
                   <h2 className="text-sm font-bold text-[#E2E8F0] flex items-center gap-2 border-b border-[#1E293B] pb-2">
-                    <Store className="w-4 h-4 text-emerald-400" /> White Label Store Profile &amp; Seychelles VAT Configuration
+                    <Store className="w-4 h-4 text-emerald-400" /> White Label Store Profile &amp; VAT Configuration
                   </h2>
                 </div>
 
@@ -3806,7 +3806,7 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
 
                   <div>
                     <label className="block text-xs font-semibold text-slate-300 mb-1">
-                      Default Seychelles VAT Tax Rate (%):
+                      Default VAT Rate (%):
                     </label>
                     <input
                       type="number"
@@ -3832,6 +3832,46 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
                       }}
                       className="w-full bg-[#0F1115] border border-[#1E293B] rounded-xl px-3.5 py-2 text-xs font-mono font-bold text-emerald-400 focus:outline-none focus:border-emerald-500"
                     />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-semibold text-slate-300 mb-2">
+                      VAT Mode:
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setSettings({ ...settings, vatInclusive: false })}
+                        className={`p-3 rounded-xl border text-left cursor-pointer transition-all ${
+                          settings.vatInclusive !== true
+                            ? 'bg-emerald-950/40 border-emerald-500/80'
+                            : 'bg-[#0F1115] border-[#1E293B] hover:border-slate-700'
+                        }`}
+                      >
+                        <div className={`text-xs font-bold ${settings.vatInclusive !== true ? 'text-emerald-300' : 'text-slate-300'}`}>
+                          Added at Checkout
+                        </div>
+                        <div className="text-[10px] text-slate-500 mt-1 leading-relaxed">
+                          Price tags exclude VAT. Tax is calculated and added on top of the subtotal at checkout (default).
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSettings({ ...settings, vatInclusive: true })}
+                        className={`p-3 rounded-xl border text-left cursor-pointer transition-all ${
+                          settings.vatInclusive === true
+                            ? 'bg-cyan-950/40 border-cyan-500/80'
+                            : 'bg-[#0F1115] border-[#1E293B] hover:border-slate-700'
+                        }`}
+                      >
+                        <div className={`text-xs font-bold ${settings.vatInclusive === true ? 'text-cyan-300' : 'text-slate-300'}`}>
+                          Included in Price Tags
+                        </div>
+                        <div className="text-[10px] text-slate-500 mt-1 leading-relaxed">
+                          Shelf prices already include VAT. The customer pays exactly the tagged price; the embedded tax is extracted for receipts and reports.
+                        </div>
+                      </button>
+                    </div>
                   </div>
                 </div>
               </>

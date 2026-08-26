@@ -713,7 +713,7 @@ export const printStandardInvoice = (
                 : `
               <table class="totals-table">
                 <tr>
-                  <td class="text-muted">Gross Subtotal (Excl. VAT):</td>
+                  <td class="text-muted">${settings.vatInclusive ? 'Subtotal (VAT Incl.):' : 'Gross Subtotal (Excl. VAT):'}</td>
                   <td class="text-right font-mono font-semibold">${primarySymbol} ${transaction.subtotal.toFixed(2)}</td>
                 </tr>
                 ${
@@ -737,7 +737,7 @@ export const printStandardInvoice = (
                     : ''
                 }
                 <tr>
-                  <td class="text-muted">Statutory VAT (${vatPctStr} Tax):</td>
+                  <td class="text-muted">VAT (${vatPctStr}${settings.vatInclusive ? ', Included' : ' Tax'}):</td>
                   <td class="text-right font-mono font-semibold">${primarySymbol} ${(transaction.vatTotal || transaction.tax || 0).toFixed(2)}</td>
                 </tr>
                 <tr class="grand-total-row">

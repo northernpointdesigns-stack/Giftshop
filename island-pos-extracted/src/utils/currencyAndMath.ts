@@ -84,7 +84,8 @@ export function calculateCartTotals(
   discountType: 'amount' | 'percent' = 'amount',
   discountValue: number = 0,
   defaultVatRate: number = 0.15,
-  exchangeRate: number = 13.50
+  exchangeRate: number = 13.50,
+  vatInclusive: boolean = false
 ): CalculatedCartTotals {
   const rate = exchangeRate > 0 ? exchangeRate : 1;
 
@@ -116,7 +117,9 @@ export function calculateCartTotals(
   const discountAmount = Math.max(0, Math.min(requestedDiscount, afterItemSubtotal));
   const netSubtotal = Math.max(0, roundMoney(afterItemSubtotal - discountAmount));
 
-  // 4. VAT calculation: proportional against net subtotal per line item's VAT rate
+  // 4. VAT calculation: proportional against net subtotal per line item's VAT rate.
+  // Exclusive mode (default): prices are NET of tax -> VAT is added on top.
+  // Inclusive mode: shelf prices already CONTAIN the tax -> VAT is extracted from the gross amount.
   const vatTotalRaw = cart.reduce((acc, c) => {
     const itemVatRate = c.item.vatRate ?? defaultVatRate;
     const basePrice = getLineBasePrice(c);
@@ -124,14 +127,22 @@ export function calculateCartTotals(
     const lineDamagedTotal = basePrice * c.quantity * (1 - lineDamagePct / 100);
     const itemDiscountRatio = afterItemSubtotal > 0 ? netSubtotal / afterItemSubtotal : 1;
     const effectiveItemTotal = lineDamagedTotal * itemDiscountRatio;
+    if (vatInclusive) {
+      return acc + (effectiveItemTotal - effectiveItemTotal / (1 + itemVatRate));
+    }
     return acc + effectiveItemTotal * itemVatRate;
   }, 0);
 
   const roundedVat = roundMoney(vatTotalRaw);
-  const grandTotal = roundMoney(netSubtotal + roundedVat);
+  // In inclusive mode the customer pays exactly the discounted shelf price, so the
+  // displayed "Subtotal (Net)" is the gross-after-discount minus the embedded VAT.
+  const taxableSubtotal = vatInclusive
+    ? Math.max(0, roundMoney(netSubtotal - roundedVat))
+    : netSubtotal;
+  const grandTotal = roundMoney(taxableSubtotal + roundedVat);
 
   // 5. Secondary currency conversion math (Guarantees Subtotal + Tax = Total)
-  const secondarySubtotal = Number((netSubtotal / rate).toFixed(2));
+  const secondarySubtotal = Number((taxableSubtotal / rate).toFixed(2));
   const secondaryTotal = Number((grandTotal / rate).toFixed(2));
   // Guarantee exact sum parity for secondary display
   const secondaryTax = Number((secondaryTotal - secondarySubtotal).toFixed(2));
@@ -145,7 +156,7 @@ export function calculateCartTotals(
     discountAmount,
     discountType,
     discountValue,
-    netSubtotal,
+    netSubtotal: taxableSubtotal,
     vatTotal: roundedVat,
     roundedVat,
     grandTotal,
@@ -156,6 +167,20 @@ export function calculateCartTotals(
     secondaryItemDiscount,
     exchangeRate: rate,
   };
+}
+
+/**
+ * Computes the VAT amount for a single line total.
+ * Exclusive mode (default): amount is NET of tax -> VAT = amount * rate.
+ * Inclusive mode: amount is GROSS (tax already inside) -> VAT = amount - amount / (1 + rate).
+ */
+export function computeVatAmount(amount: number, rate: number, vatInclusive: boolean): number {
+  if (vatInclusive && rate > -1) {
+    const gross = Math.abs(amount);
+    const vat = gross - gross / (1 + rate);
+    return Number((amount < 0 ? -vat : vat).toFixed(2));
+  }
+  return Number((amount * rate).toFixed(2));
 }
 
 /**

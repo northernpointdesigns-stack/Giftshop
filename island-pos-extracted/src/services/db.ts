@@ -22,7 +22,7 @@ import { generateSQLiteDatabaseDump } from '../utils/sqliteExport';
 import { scheduledBackupService } from './scheduledBackupService';
 import { offlineSyncEngine } from './offlineSyncEngine';
 import { DEFAULT_BARCODE_RULES } from '../utils/barcodeEngine';
-import { calculateCartTotals, roundMoney } from '../utils/currencyAndMath';
+import { calculateCartTotals, computeVatAmount, roundMoney } from '../utils/currencyAndMath';
 import { priceTierSyncService } from './priceTierSyncService';
 
 const DEFAULT_PRICE_LISTS: PriceList[] = [
@@ -56,7 +56,8 @@ const DEFAULT_CUSTOMERS: Customer[] = [];
 const DEFAULT_DRAWER_LOGS: CashDrawerLog[] = [];
 
 export const DEFAULT_SETTINGS: StoreSettings = {
-  defaultVatRate: 0.15, // 15% Seychelles VAT
+  defaultVatRate: 0.15, // 15% VAT
+  vatInclusive: false, // false = VAT added at checkout; true = price tags already include VAT
   storeName: 'The Gift Shop',
   posAppName: 'The Gift Shop POS',
   posShortName: 'TGS',
@@ -1053,7 +1054,7 @@ class PosDatabase {
       const totalPrice = Number((grossTotal * (1 - lineDamagePct / 100)).toFixed(2));
       const lineDiscountAmount = Number((grossTotal - totalPrice).toFixed(2));
       const vatRate = item.vatRate ?? this.settings.defaultVatRate;
-      const vatAmount = Number((totalPrice * vatRate).toFixed(2));
+      const vatAmount = computeVatAmount(totalPrice, vatRate, this.settings.vatInclusive === true);
 
       let vendorPayout = 0;
       let houseProfit = 0;
@@ -1105,7 +1106,8 @@ class PosDatabase {
       'amount',
       discountAmount,
       this.settings.defaultVatRate,
-      this.settings.exchangeRate
+      this.settings.exchangeRate,
+      this.settings.vatInclusive === true
     );
     const itemDiscountTotal = calculatedTotals.itemDiscountTotal;
     const subtotal = calculatedTotals.netSubtotal;
@@ -1115,9 +1117,12 @@ class PosDatabase {
     // Distribute an order-level discount across the saved lines. This keeps
     // receipts, inventory reports, profit figures, and consignment payouts on
     // the actual final selling price rather than the pre-discount list price.
+    // (Mode-independent: purely the share of the after-item-discount subtotal
+    // that survives the order-level discount.)
     const orderDiscountRatio =
       calculatedTotals.afterItemSubtotal > 0
-        ? calculatedTotals.netSubtotal / calculatedTotals.afterItemSubtotal
+        ? (calculatedTotals.afterItemSubtotal - calculatedTotals.discountAmount) /
+          calculatedTotals.afterItemSubtotal
         : 1;
     txItems.forEach((txItem) => {
       const preOrderDiscountTotal = txItem.totalPrice;
@@ -1125,7 +1130,11 @@ class PosDatabase {
       const orderDiscountShare = roundMoney(preOrderDiscountTotal - finalLineTotal);
       txItem.totalPrice = finalLineTotal;
       txItem.discountAmount = roundMoney((txItem.discountAmount || 0) + orderDiscountShare) || undefined;
-      txItem.vatAmount = roundMoney(finalLineTotal * txItem.vatRate);
+      txItem.vatAmount = computeVatAmount(
+        finalLineTotal,
+        txItem.vatRate,
+        this.settings.vatInclusive === true
+      );
 
       if (txItem.supplierType === 'consignment') {
         const vendor = this.getVendorById(txItem.vendorId);
@@ -1393,7 +1402,7 @@ class PosDatabase {
       const negQuantity = -Math.abs(quantity);
       const totalPrice = -Math.abs(actualUnitPrice * quantity);
       const vatRate = item.vatRate ?? this.settings.defaultVatRate;
-      const vatAmount = Number((totalPrice * vatRate).toFixed(2));
+      const vatAmount = computeVatAmount(totalPrice, vatRate, this.settings.vatInclusive === true);
 
       let vendorPayout = 0;
       let houseProfit = 0;

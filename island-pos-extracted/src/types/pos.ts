@@ -264,6 +264,7 @@ export interface CustomCatalogTemplate {
 
 export interface StoreSettings {
   defaultVatRate: number; // e.g. 0.15 for 15% VAT
+  vatInclusive?: boolean; // true = shelf prices already include VAT (extract at checkout); false = VAT added on top
   storeName: string;
   taxRegistrationNumber?: string;
   adminUsername?: string;

@@ -279,7 +279,7 @@ export const CashierPOS: React.FC<CashierPOSProps> = ({
   });
 
   // Calculate cart totals using centralized precision math utility
-  const totals = calculateCartTotals(cart, discountType, discountValue, vatRate, exchangeRate);
+  const totals = calculateCartTotals(cart, discountType, discountValue, vatRate, exchangeRate, settings.vatInclusive === true);
   const {
     rawSubtotal,
     itemDiscountTotal,
@@ -938,7 +938,7 @@ export const CashierPOS: React.FC<CashierPOSProps> = ({
 
                       {/* Brand name and SKU - compact */}
                       <div className="flex items-center justify-between text-[10px] text-slate-500 mb-0.5 font-medium px-0.5">
-                        <span className="truncate">{item.brand || 'Seychelles'}</span>
+                        <span className="truncate">{item.brand || 'Unbranded'}</span>
                         {item.size && <span className="font-mono text-[9px] text-slate-400 bg-slate-800 px-1 py-0.2 rounded">{item.size}</span>}
                       </div>
 
@@ -1322,7 +1322,7 @@ export const CashierPOS: React.FC<CashierPOSProps> = ({
                             <span className="text-cyan-400">({secondarySymbol}{(basePrice / exchangeRate).toFixed(2)} {secondaryCode})</span>
                           )}
                           <span className="text-slate-600">•</span>
-                          <span className="text-cyan-400">{Math.round((item.vatRate ?? 0.15) * 100)}% VAT</span>
+                          <span className="text-cyan-400">{Math.round((item.vatRate ?? 0.15) * 100)}% VAT{settings.vatInclusive ? ' incl.' : ''}</span>
                           {isConsignment && (
                             <span className="text-amber-400 font-semibold">(Deposit)</span>
                           )}
@@ -1441,9 +1441,9 @@ export const CashierPOS: React.FC<CashierPOSProps> = ({
               )}
               <div className="flex justify-between text-cyan-400 font-semibold">
                 <span className="flex items-center gap-1">
-                  <Percent className="w-3 h-3" /> VAT Tax Breakdown ({( (cart[0]?.item.vatRate ?? settings.defaultVatRate ?? 0.15) * 100 ).toFixed(0)}%)
+                  <Percent className="w-3 h-3" /> VAT ({( (cart[0]?.item.vatRate ?? settings.defaultVatRate ?? 0.15) * 100 ).toFixed(0)}%) {settings.vatInclusive ? '— Included' : 'Tax'}
                 </span>
-                <span className="font-mono">+{primarySymbol} {roundedVat.toFixed(2)}</span>
+                <span className="font-mono">{settings.vatInclusive ? 'incl. ' : '+'}{primarySymbol} {roundedVat.toFixed(2)}</span>
               </div>
               {(() => {
                 const multiEqs = getMultiCurrencyEquivalents(grandTotal, settings);

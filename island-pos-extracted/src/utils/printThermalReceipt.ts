@@ -75,7 +75,7 @@ export const printThermalReceipt = (
             ? `<div class="item-discount">- Markdown (${item.damageDiscountPercent || 0}%): -${primarySymbol} ${item.discountAmount.toFixed(2)}</div>`
             : ''
         }
-        <div class="item-vat">VAT ${( (item.vatRate || 0.15) * 100 ).toFixed(0)}%: ${primarySymbol} ${(item.vatAmount || 0).toFixed(2)}</div>
+        <div class="item-vat">VAT ${( (item.vatRate || 0.15) * 100 ).toFixed(0)}%${settings.vatInclusive ? ' incl.' : ''}: ${primarySymbol} ${(item.vatAmount || 0).toFixed(2)}</div>
       `
       }
     </div>
@@ -398,7 +398,7 @@ export const printThermalReceipt = (
               : ''
           }
           <div class="totals-row">
-            <span>VAT Tax Amount:</span>
+            <span>VAT Tax Amount${settings.vatInclusive ? ' (Included)' : ''}:</span>
             <span>${primarySymbol} ${(transaction.vatTotal || transaction.tax || 0).toFixed(2)}</span>
           </div>
 

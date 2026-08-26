@@ -50,7 +50,7 @@ const TARGET_DB_FIELDS: { id: keyof FieldMapping; label: string; required?: bool
   { id: 'costBasis', label: 'Unit Cost Basis ($)', description: 'Wholesale acquisition cost or supplier cut' },
   { id: 'stockLevel', label: 'Stock Quantity', description: 'Available inventory units on hand' },
   { id: 'minStockThreshold', label: 'Min Alert Stock', description: 'Low stock notification limit' },
-  { id: 'vatRate', label: 'VAT Rate (%)', description: 'Applicable tax rate (e.g. 15 for 15% Seychelles VAT)' },
+  { id: 'vatRate', label: 'VAT Rate (%)', description: 'Applicable tax rate (e.g. 15 for 15% VAT)' },
   { id: 'vendorName', label: 'Supplier / Vendor Name', description: 'Vendor supplier name' },
 ];
 
@@ -88,7 +88,7 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
 
   const [vatConfig, setVatConfig] = useState<VatConfig>({
     calculationMode: 'exclusive', // 'exclusive' = CSV has Net Price (add VAT), 'inclusive' = CSV has Gross Price (extract VAT)
-    defaultVatRate: 0.15, // 15% Seychelles VAT
+    defaultVatRate: 0.15, // 15% VAT
     applyGlobalOverride: false,
   });
 
@@ -572,7 +572,7 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
 
                 <div className="flex items-center gap-2 text-xs">
                   <span className="text-cyan-400 font-semibold flex items-center gap-1">
-                    <Percent className="w-3.5 h-3.5" /> Seychelles VAT Rate:
+                    <Percent className="w-3.5 h-3.5" /> VAT Rate:
                   </span>
                   <input
                     type="number"
