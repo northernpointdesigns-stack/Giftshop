@@ -19,11 +19,12 @@ export const DigitalReceiptHub: React.FC<DigitalReceiptHubProps> = ({
   );
 
   const settings = posDb.getSettings();
-  const primarySymbol = settings.primaryCurrencySymbol || 'SR';
-  const primaryCode = settings.primaryCurrency || 'SCR';
+  const primarySymbol = settings.primaryCurrencySymbol || '$';
+;
+  const primaryCode = settings.primaryCurrency || 'USD';
   const secondarySymbol = settings.secondaryCurrencySymbol || '$';
   const secondaryCode = settings.secondaryCurrency || 'USD';
-  const exchangeRate = settings.exchangeRate || 13.50;
+  const exchangeRate = settings.exchangeRate || 1;
 
   // Feedback State
   const [rating, setRating] = useState<number>(0);

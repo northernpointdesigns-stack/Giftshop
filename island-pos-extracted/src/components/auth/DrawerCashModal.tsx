@@ -64,7 +64,8 @@ export const DrawerCashModal: React.FC<DrawerCashModalProps> = ({
   onChanged,
 }) => {
   const activeSession = posDb.getActiveEODSession();
-  const currencySymbol = settings.primaryCurrencySymbol || 'SR';
+  const currencySymbol = settings.primaryCurrencySymbol || '$';
+;
 
   const [movementType, setMovementType] = useState<CashDrawerEventType>('paid_out');
   const [amount, setAmount] = useState('');

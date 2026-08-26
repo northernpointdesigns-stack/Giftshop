@@ -57,11 +57,12 @@ export const SalesHeatmap: React.FC<SalesHeatmapProps> = ({
   onRefreshData,
 }) => {
   const settings = posDb.getSettings();
-  const primarySymbol = settings.primaryCurrencySymbol || 'SR';
-  const primaryCode = settings.primaryCurrency || 'SCR';
+  const primarySymbol = settings.primaryCurrencySymbol || '$';
+;
+  const primaryCode = settings.primaryCurrency || 'USD';
   const secondarySymbol = settings.secondaryCurrencySymbol || '$';
   const secondaryCode = settings.secondaryCurrency || 'USD';
-  const exchangeRate = settings.exchangeRate || 13.50;
+  const exchangeRate = settings.exchangeRate || 1;
 
   // View state
   const [viewMode, setViewMode] = useState<ViewMode>('heatmap');

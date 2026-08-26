@@ -84,7 +84,7 @@ export function calculateCartTotals(
   discountType: 'amount' | 'percent' = 'amount',
   discountValue: number = 0,
   defaultVatRate: number = 0.15,
-  exchangeRate: number = 13.50,
+  exchangeRate: number = 1,
   vatInclusive: boolean = false
 ): CalculatedCartTotals {
   const rate = exchangeRate > 0 ? exchangeRate : 1;
@@ -237,12 +237,13 @@ export function getMultiCurrencyEquivalents(
     customerDisplayCurrencies?: { code: string; symbol: string; rate: number; enabled?: boolean }[];
   }
 ): EquivalentCurrency[] {
-  const pCode = settings.primaryCurrency || 'SCR';
-  const pSymbol = settings.primaryCurrencySymbol || 'SR';
+  const pCode = settings.primaryCurrency || 'USD';
+  const pSymbol = settings.primaryCurrencySymbol || '$';
+;
 
   const sCode = settings.secondaryCurrency || 'USD';
   const sSymbol = settings.secondaryCurrencySymbol || '$';
-  const sRate = settings.exchangeRate && settings.exchangeRate > 0 ? settings.exchangeRate : 13.50;
+  const sRate = settings.exchangeRate && settings.exchangeRate > 0 ? settings.exchangeRate : 1;
 
   const primaryAmt = Number((totalInPrimary || 0).toFixed(2));
   const secondaryAmt = Number(((totalInPrimary || 0) / sRate).toFixed(2));
@@ -270,10 +271,11 @@ export function getMultiCurrencyEquivalents(
     },
   ];
 
-  // Check custom display currencies for 3rd (and 4th) currency
+  // Extra reference currencies (3rd / 4th) appear ONLY when the shop
+  // configures them — no fabricated defaults for unconfigured slots.
   const configured = settings.customerDisplayCurrencies || [];
   const enabledExtras = configured.filter(
-    (c) => c.enabled !== false && c.code && c.code !== pCode && c.code !== sCode && c.rate > 0
+    (c) => c.enabled !== false && c.code && c.code !== pCode && c.rate > 0
   );
 
   if (enabledExtras.length > 0) {
@@ -289,20 +291,6 @@ export function getMultiCurrencyEquivalents(
         color: idx === 0 ? 'purple' : 'amber',
         isThird: idx === 0,
       });
-    });
-  } else {
-    // Standard default 3rd currency (EUR @ 14.60 SCR) if no extras enabled
-    const defaultThirdRate = 14.60;
-    const defaultThirdAmt = Number(((totalInPrimary || 0) / defaultThirdRate).toFixed(2));
-    result.push({
-      code: 'EUR',
-      symbol: '€',
-      rate: defaultThirdRate,
-      amount: defaultThirdAmt,
-      formatted: `€ ${defaultThirdAmt.toFixed(2)} EUR`,
-      label: '3rd Currency',
-      color: 'purple',
-      isThird: true,
     });
   }
 

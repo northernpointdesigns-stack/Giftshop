@@ -27,7 +27,8 @@ export const MetricOverview: React.FC<MetricOverviewProps> = ({
   activeTab
 }) => {
   const settings = posDb.getSettings();
-  const currencySymbol = settings.primaryCurrencySymbol || 'SR';
+  const currencySymbol = settings.primaryCurrencySymbol || '$';
+;
 
   // 1. Calculate Today's Sales
   const todayStr = new Date().toISOString().split('T')[0];

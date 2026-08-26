@@ -26,11 +26,12 @@ export const CustomerDisplay: React.FC<CustomerDisplayProps> = ({
   const [state, setState] = useState<CustomerDisplayState>(customerChannel.getCurrentState());
   const [settings, setSettings] = useState(() => posDb.getSettings());
 
-  const primarySymbol = state.primarySymbol || settings.primaryCurrencySymbol || 'SR';
-  const primaryCode = state.primaryCurrency || settings.primaryCurrency || 'SCR';
+  const primarySymbol = state.primarySymbol || settings.primaryCurrencySymbol || '$';
+;
+  const primaryCode = state.primaryCurrency || settings.primaryCurrency || 'USD';
   const secondarySymbol = state.secondarySymbol || settings.secondaryCurrencySymbol || '$';
   const secondaryCode = state.secondaryCurrency || settings.secondaryCurrency || 'USD';
-  const exchangeRate = state.exchangeRate || settings.exchangeRate || 13.50;
+  const exchangeRate = state.exchangeRate || settings.exchangeRate || 1;
 
   // Selected viewing currency on customer display
   const [selectedCurrencyCode, setSelectedCurrencyCode] = useState<string>(

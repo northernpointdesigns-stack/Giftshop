@@ -141,7 +141,8 @@ export const computeGrossLiability = (taxable: number, brackets: Bracket[], flat
 
 export const TaxReturnAssistant: React.FC<TaxReturnAssistantProps> = ({ transactions }) => {
   const settings = posDb.getSettings();
-  const symbol = settings.primaryCurrencySymbol || 'SR';
+  const symbol = settings.primaryCurrencySymbol || '$';
+;
 
   const [year, setYear] = useState(String(new Date().getFullYear() - 1));
   const [draft, setDraft] = useState<TaxDraft>(() => {
@@ -245,7 +246,7 @@ export const TaxReturnAssistant: React.FC<TaxReturnAssistantProps> = ({ transact
       @media print{.noprint{display:none}}
     </style></head><body>
       <h1>UNIVERSAL INDIVIDUAL INCOME TAX RETURN</h1>
-      <p style="text-align:center;margin:2px 0 12px;font-size:11px">Tax Year ${draft.year} • Currency: ${settings.primaryCurrency || 'SCR'} (${symbol})</p>
+      <p style="text-align:center;margin:2px 0 12px;font-size:11px">Tax Year ${draft.year} • Currency: ${settings.primaryCurrency || 'USD'} (${symbol})</p>
 
       <h2>1. TAXPAYER IDENTIFICATION &amp; FILING STATUS</h2>
       <div class="meta"><span><b>Name:</b> ${draft.name || '—'}</span><span><b>TIN:</b> ${draft.tin || '—'}</span></div>

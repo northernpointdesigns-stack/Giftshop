@@ -30,11 +30,12 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
   const settings = posDb.getSettings();
   const inventory = posDb.getInventory();
 
-  const primarySymbol = settings.primaryCurrencySymbol || 'SR';
-  const primaryCode = settings.primaryCurrency || 'SCR';
+  const primarySymbol = settings.primaryCurrencySymbol || '$';
+;
+  const primaryCode = settings.primaryCurrency || 'USD';
   const secondarySymbol = settings.secondaryCurrencySymbol || '$';
   const secondaryCode = settings.secondaryCurrency || 'USD';
-  const exchangeRate = settings.exchangeRate || 13.50;
+  const exchangeRate = settings.exchangeRate || 1;
 
   useEffect(() => {
     if (barcodeRef.current && transaction) {

@@ -77,11 +77,12 @@ export const auditReceiptTransaction = (
   settings?: StoreSettings
 ): ReceiptAuditReport => {
   const storeSettings = settings || posDb.getSettings();
-  const primaryCode = storeSettings.primaryCurrency || 'SCR';
-  const primarySymbol = storeSettings.primaryCurrencySymbol || 'SR';
+  const primaryCode = storeSettings.primaryCurrency || 'USD';
+  const primarySymbol = storeSettings.primaryCurrencySymbol || '$';
+;
   const secondaryCode = storeSettings.secondaryCurrency || 'USD';
   const secondarySymbol = storeSettings.secondaryCurrencySymbol || '$';
-  const exchangeRate = storeSettings.exchangeRate || 13.50;
+  const exchangeRate = storeSettings.exchangeRate || 1;
 
   const issues: AuditIssue[] = [];
   let totalDiscrepancyAmount = 0;

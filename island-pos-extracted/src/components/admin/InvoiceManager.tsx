@@ -16,8 +16,9 @@ interface InvoiceManagerProps {
 
 export const InvoiceManager: React.FC<InvoiceManagerProps> = ({ onRefreshData }) => {
   const settings = posDb.getSettings();
-  const primarySymbol = settings.primaryCurrencySymbol || 'SR';
-  const primaryCode = settings.primaryCurrency || 'SCR';
+  const primarySymbol = settings.primaryCurrencySymbol || '$';
+;
+  const primaryCode = settings.primaryCurrency || 'USD';
 
   const [invoices, setInvoices] = useState<Invoice[]>(() => posDb.getInvoices());
   const [editing, setEditing] = useState<Invoice | null>(null);

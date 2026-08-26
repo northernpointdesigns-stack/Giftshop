@@ -38,7 +38,8 @@ export const CloseShiftModal: React.FC<CloseShiftModalProps> = ({
   onRefreshData,
 }) => {
   const activeSession = posDb.getActiveEODSession();
-  const currencySymbol = settings.primaryCurrencySymbol || 'SR';
+  const currencySymbol = settings.primaryCurrencySymbol || '$';
+;
 
   const [actualCash, setActualCash] = useState('');
   const [closingNotes, setClosingNotes] = useState('');

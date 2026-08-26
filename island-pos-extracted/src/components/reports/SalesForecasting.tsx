@@ -36,11 +36,11 @@ export const SalesForecasting: React.FC<SalesForecastingProps> = ({
   onRefreshData,
 }) => {
   const settings = posDb.getSettings();
-  const primarySymbol = settings.primaryCurrencySymbol || 'SR';
-  const primaryCode = settings.primaryCurrency || 'SCR';
+  const primarySymbol = settings.primaryCurrencySymbol || '$';
+  const primaryCode = settings.primaryCurrency || 'USD';
   const secondarySymbol = settings.secondaryCurrencySymbol || '$';
   const secondaryCode = settings.secondaryCurrency || 'USD';
-  const exchangeRate = settings.exchangeRate || 13.50;
+  const exchangeRate = settings.exchangeRate || 1;
 
   // Configurations
   const [historicalDays, setHistoricalDays] = useState<7 | 14 | 30 | 90>(30);

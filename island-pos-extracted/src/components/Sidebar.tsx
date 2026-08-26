@@ -492,12 +492,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <label className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Active Currency:</label>
                   <div className="flex flex-wrap bg-[#0B0D12] border border-[#1E293B] rounded-lg p-0.5 gap-0.5">
                     <button
-                      onClick={() => onSwitchCurrencyView && onSwitchCurrencyView(settings.primaryCurrency || 'SCR')}
+                      onClick={() => onSwitchCurrencyView && onSwitchCurrencyView(settings.primaryCurrency || 'USD')}
                       className={`flex-1 py-1 rounded-md text-[10px] font-bold font-mono transition-all ${
-                        activeCurrencyView === (settings.primaryCurrency || 'SCR') ? 'bg-emerald-600 text-white' : 'text-slate-500 hover:text-slate-300'
+                        activeCurrencyView === (settings.primaryCurrency || 'USD') ? 'bg-emerald-600 text-white' : 'text-slate-500 hover:text-slate-300'
                       }`}
                     >
-                      {settings.primaryCurrency || 'SCR'}
+                      {settings.primaryCurrency || 'USD'}
                     </button>
                     <button
                       onClick={() => onSwitchCurrencyView && onSwitchCurrencyView(settings.secondaryCurrency || 'USD')}
@@ -543,7 +543,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <div className="bg-[#161B22]/60 border border-[#1E293B]/40 p-2 rounded-lg flex flex-col justify-between">
                   <span className="text-[8px] text-slate-500 font-bold uppercase tracking-wider">Today Sales</span>
                   <span className="text-xs font-black font-mono text-emerald-400 mt-0.5">
-                    {settings.primaryCurrencySymbol || 'SR'} {todaySalesTotal.toFixed(2)}
+                    {settings.primaryCurrencySymbol || '$'} {todaySalesTotal.toFixed(2)}
                   </span>
                   <span className="text-[7px] text-slate-500 font-medium truncate mt-0.5">
                     {todayTransactions.length} ticket{todayTransactions.length === 1 ? '' : 's'}
@@ -554,7 +554,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <div className="bg-[#161B22]/60 border border-[#1E293B]/40 p-2 rounded-lg flex flex-col justify-between">
                   <span className="text-[8px] text-slate-500 font-bold uppercase tracking-wider">Total Volume</span>
                   <span className="text-xs font-black font-mono text-cyan-400 mt-0.5">
-                    {settings.primaryCurrencySymbol || 'SR'} {totalSalesTotal.toFixed(2)}
+                    {settings.primaryCurrencySymbol || '$'} {totalSalesTotal.toFixed(2)}
                   </span>
                   <span className="text-[7px] text-slate-500 font-medium truncate mt-0.5">
                     Gross Volume

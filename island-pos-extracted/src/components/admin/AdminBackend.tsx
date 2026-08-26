@@ -175,7 +175,7 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
       cashGiven: 50.00,
       changeDue: 6.70,
       currencyUsed: 'primary',
-      exchangeRateUsed: settings.exchangeRate || 13.50,
+      exchangeRateUsed: settings.exchangeRate || 1,
       items: [
         {
           id: 'test-item-1',
@@ -372,7 +372,7 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
     setFooterLinesText((currSettings.receiptFooterLines || []).join('\n'));
 
     // Sync numeric input string buffers
-    setExchangeRateStr(String(currSettings.exchangeRate ?? 13.5));
+    setExchangeRateStr(String(currSettings.exchangeRate ?? 1));
     setVatRateStr(String(Math.round((currSettings.defaultVatRate ?? 0.15) * 100)));
     const dc0 = currSettings.customerDisplayCurrencies?.[0]?.rate;
     const dc1 = currSettings.customerDisplayCurrencies?.[1]?.rate;
@@ -2295,9 +2295,9 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
                     <th className="p-3">Product Title / Description</th>
                     <th className="p-3">POS Category Tab</th>
                     <th className="p-3">Barcode SKU</th>
-                    <th className="p-3 w-28 text-right">Retail ({settings.primaryCurrencySymbol || 'SR'})</th>
+                    <th className="p-3 w-28 text-right">Retail ({settings.primaryCurrencySymbol || '$'})</th>
                     <th className="p-3 w-32 text-right">Retail ({settings.secondaryCurrencySymbol || '$'}) Override</th>
-                    <th className="p-3 w-28 text-right">Cost ({settings.primaryCurrencySymbol || 'SR'})</th>
+                    <th className="p-3 w-28 text-right">Cost ({settings.primaryCurrencySymbol || '$'})</th>
                     <th className="p-3 text-center">Stock</th>
                     <th className="p-3 text-right">Action</th>
                   </tr>
@@ -2361,7 +2361,7 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
                         {/* Retail Price */}
                         <td className="p-2.5 text-right">
                           <div className="relative inline-block w-24">
-                            <span className="absolute left-1.5 top-1.5 text-emerald-500 font-bold text-[10px]">{settings.primaryCurrencySymbol || 'SR'}</span>
+                            <span className="absolute left-1.5 top-1.5 text-emerald-500 font-bold text-[10px]">{settings.primaryCurrencySymbol || '$'}</span>
                             <input
                               type="number"
                               step="0.01"
@@ -2385,7 +2385,7 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
                             <input
                               type="number"
                               step="0.01"
-                              placeholder={(draft.retailPrice / (settings.exchangeRate || 13.50)).toFixed(2)}
+                              placeholder={(draft.retailPrice / (settings.exchangeRate || 1)).toFixed(2)}
                               value={draft.retailPriceSecondary || ''}
                               onChange={(e) =>
                                 handlePriceFieldChange(
@@ -2403,7 +2403,7 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
                         {/* Cost Basis */}
                         <td className="p-2.5 text-right">
                           <div className="relative inline-block w-24">
-                            <span className="absolute left-1.5 top-1.5 text-slate-500 text-[10px]">{settings.primaryCurrencySymbol || 'SR'}</span>
+                            <span className="absolute left-1.5 top-1.5 text-slate-500 text-[10px]">{settings.primaryCurrencySymbol || '$'}</span>
                             <input
                               type="number"
                               step="0.01"
@@ -4460,8 +4460,8 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
                 <div className="space-y-1.5">
                   <CurrencySearchPicker
                     label="Primary Currency (Search & Select):"
-                    selectedCode={settings.primaryCurrency || 'SCR'}
-                    selectedSymbol={settings.primaryCurrencySymbol || 'SR'}
+                    selectedCode={settings.primaryCurrency || 'USD'}
+                    selectedSymbol={settings.primaryCurrencySymbol || '$'}
                     onSelectCurrency={(code, symbol) => {
                       setSettings({
                         ...settings,
@@ -4527,7 +4527,7 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
                 {/* Exchange Rate with Backspace-friendly string state */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Exchange Rate (1 {settings.secondaryCurrency || 'USD'} = X {settings.primaryCurrency || 'SCR'}):
+                    Exchange Rate (1 {settings.secondaryCurrency || 'USD'} = X {settings.primaryCurrency || 'USD'}):
                   </label>
                   <input
                     type="number"
@@ -4544,13 +4544,13 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
                     }}
                     onBlur={() => {
                       if (exchangeRateStr.trim() === '') {
-                        setExchangeRateStr(String(settings.exchangeRate || 13.5));
+                        setExchangeRateStr(String(settings.exchangeRate || 1));
                       }
                     }}
                     className="w-full bg-[#0F1115] border border-[#1E293B] rounded-xl px-3.5 py-2 text-xs font-mono font-bold text-emerald-400 focus:outline-none focus:border-emerald-500"
                   />
                   <p className="text-[10px] text-slate-500 mt-1">
-                    Full backspace supported. Type freely (e.g. 13.50).
+                    Full backspace supported. Type freely — update it any day the rate changes.
                   </p>
                 </div>
 
@@ -4564,7 +4564,7 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
                     onChange={(e) => setSettings({ ...settings, defaultCurrencyMode: e.target.value as any })}
                     className="w-full bg-[#0F1115] border border-[#1E293B] rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-emerald-500"
                   >
-                    <option value="primary">Primary ({settings.primaryCurrencySymbol || 'SR'})</option>
+                    <option value="primary">Primary ({settings.primaryCurrencySymbol || '$'})</option>
                     <option value="secondary">Secondary ({settings.secondaryCurrencySymbol || '$'})</option>
                   </select>
                 </div>
@@ -4643,7 +4643,7 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
 
                         <div>
                           <label className="block text-[10px] font-semibold text-slate-400 mb-1">
-                            Rate (1 {dc.code || (slotIdx === 0 ? 'EUR' : 'USD')} = X {settings.primaryCurrency || 'SCR'}):
+                            Rate (1 {dc.code || (slotIdx === 0 ? 'EUR' : 'USD')} = X {settings.primaryCurrency || 'USD'}):
                           </label>
                           <input
                             type="number"

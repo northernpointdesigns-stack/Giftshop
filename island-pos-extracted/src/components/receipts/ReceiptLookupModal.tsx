@@ -43,11 +43,12 @@ export const ReceiptLookupModal: React.FC<ReceiptLookupModalProps> = ({
   onInitiateRefund,
 }) => {
   const settings = posDb.getSettings();
-  const primarySymbol = settings.primaryCurrencySymbol || 'SR';
-  const primaryCode = settings.primaryCurrency || 'SCR';
+  const primarySymbol = settings.primaryCurrencySymbol || '$';
+;
+  const primaryCode = settings.primaryCurrency || 'USD';
   const secondarySymbol = settings.secondaryCurrencySymbol || '$';
   const secondaryCode = settings.secondaryCurrency || 'USD';
-  const exchangeRate = settings.exchangeRate || 13.50;
+  const exchangeRate = settings.exchangeRate || 1;
 
   const [searchQuery, setSearchQuery] = useState<string>(initialReceiptNumber);
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(() => {

@@ -10,7 +10,8 @@ export const EODBalancing: React.FC = () => {
   const activeSession = posDb.getActiveEODSession();
 
   const settings = posDb.getSettings();
-  const primarySymbol = settings.primaryCurrencySymbol || 'SR';
+  const primarySymbol = settings.primaryCurrencySymbol || '$';
+;
 
   // Cash Drawer History Filters
   const [logFilter, setLogFilter] = useState<'all' | 'shift' | 'adjustments' | 'drops' | 'manual'>('all');

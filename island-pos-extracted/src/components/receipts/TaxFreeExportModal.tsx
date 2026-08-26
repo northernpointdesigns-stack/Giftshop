@@ -37,8 +37,9 @@ export const TaxFreeExportModal: React.FC<TaxFreeExportModalProps> = ({
   onUpdateTransaction,
 }) => {
   const settings = posDb.getSettings();
-  const primarySymbol = settings.primaryCurrencySymbol || 'SR';
-  const primaryCode = settings.primaryCurrency || 'SCR';
+  const primarySymbol = settings.primaryCurrencySymbol || '$';
+;
+  const primaryCode = settings.primaryCurrency || 'USD';
 
   const existing = transaction.taxFreeDetails;
 
@@ -142,7 +143,7 @@ export const TaxFreeExportModal: React.FC<TaxFreeExportModalProps> = ({
           <div className="bg-[#0F1115] border border-blue-500/30 rounded-xl p-3.5 space-y-2">
             <div className="text-[11px] font-bold text-blue-400 uppercase tracking-wider flex items-center justify-between">
               <span>VAT Tax Refund Calculation</span>
-              <span className="font-mono text-slate-400">TIN: {settings.taxRegistrationNumber || 'SR-VAT-100293'}</span>
+              <span className="font-mono text-slate-400">TIN: {settings.taxRegistrationNumber || '—'}</span>
             </div>
             <div className="grid grid-cols-3 gap-2 text-center text-xs">
               <div className="bg-[#161B22] p-2 rounded-lg border border-[#1E293B]">

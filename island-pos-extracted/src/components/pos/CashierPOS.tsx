@@ -88,11 +88,12 @@ export const CashierPOS: React.FC<CashierPOSProps> = ({
   priceNoticeMsg,
 }) => {
   const settings = posDb.getSettings();
-  const primarySymbol = settings.primaryCurrencySymbol || 'SR';
-  const primaryCode = settings.primaryCurrency || 'SCR';
+  const primarySymbol = settings.primaryCurrencySymbol || '$';
+;
+  const primaryCode = settings.primaryCurrency || 'USD';
   const secondarySymbol = settings.secondaryCurrencySymbol || '$';
   const secondaryCode = settings.secondaryCurrency || 'USD';
-  const exchangeRate = settings.exchangeRate || 13.50;
+  const exchangeRate = settings.exchangeRate || 1;
 
   const [selectedBrand, setSelectedBrand] = useState<string>('All');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');

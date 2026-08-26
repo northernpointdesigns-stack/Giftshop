@@ -49,8 +49,9 @@ export const WelcomeOnboardingModal: React.FC<WelcomeOnboardingModalProps> = ({
   const [openingNotes, setOpeningNotes] = useState('');
   const [step2Error, setStep2Error] = useState('');
 
-  const currencySymbol = settings.primaryCurrencySymbol || 'SR';
-  const currencyCode = settings.primaryCurrency || 'SCR';
+  const currencySymbol = settings.primaryCurrencySymbol || '$';
+;
+  const currencyCode = settings.primaryCurrency || 'USD';
 
   const todayStr = new Date().toLocaleDateString(undefined, {
     weekday: 'long',

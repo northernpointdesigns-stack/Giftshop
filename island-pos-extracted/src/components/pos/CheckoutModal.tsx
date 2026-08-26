@@ -82,11 +82,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   // Store Settings for Currency
   const settings = posDb.getSettings();
-  const primarySymbol = settings.primaryCurrencySymbol || 'SR';
-  const primaryCode = settings.primaryCurrency || 'SCR';
+  const primarySymbol = settings.primaryCurrencySymbol || '$';
+;
+  const primaryCode = settings.primaryCurrency || 'USD';
   const secondarySymbol = settings.secondaryCurrencySymbol || '$';
   const secondaryCode = settings.secondaryCurrency || 'USD';
-  const exchangeRate = settings.exchangeRate || 13.50;
+  const exchangeRate = settings.exchangeRate || 1;
   const allowSecondaryPayment = settings.allowPaymentInSecondary !== false;
 
   const [checkoutCurrency, setCheckoutCurrency] = useState<'primary' | 'secondary'>(
@@ -943,7 +944,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                       <input
                         type="number"
                         step="0.01"
-                        placeholder="13.50"
+                        placeholder="e.g. 0.92"
                         value={splitCustomRate}
                         onChange={(e) => setSplitCustomRate(e.target.value)}
                         className="w-full bg-[#0F1115] border border-[#1E293B] rounded p-1.5 text-xs text-white font-mono"

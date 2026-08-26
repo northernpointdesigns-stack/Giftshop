@@ -35,8 +35,9 @@ export const TransactionHistory: React.FC<TransactionHistoryProps> = ({
 
   const settings = posDb.getSettings();
   const inventory = posDb.getInventory();
-  const primarySymbol = settings.primaryCurrencySymbol || 'SR';
-  const primaryCode = settings.primaryCurrency || 'SCR';
+  const primarySymbol = settings.primaryCurrencySymbol || '$';
+;
+  const primaryCode = settings.primaryCurrency || 'USD';
   const secondarySymbol = settings.secondaryCurrencySymbol || '$';
   const secondaryCode = settings.secondaryCurrency || 'USD';
 

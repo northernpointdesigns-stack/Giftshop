@@ -129,7 +129,7 @@ export default function App() {
   });
   const [activeCurrencyView, setActiveCurrencyView] = useState<string>(() => {
     const s = posDb.getSettings();
-    return s.primaryCurrency || 'SCR';
+    return s.primaryCurrency || 'USD';
   });
   const [isRefundModalOpen, setIsRefundModalOpen] = useState(false);
   const [priceNoticeMsg, setPriceNoticeMsg] = useState<string | null>(null);
@@ -408,7 +408,7 @@ export default function App() {
         storeName={resolveStoreName(settings)}
         storeTagline={settings.receiptHeaderSubtitle}
         cashierName={currentStaff.name}
-        currencySymbol={settings.primaryCurrencySymbol || 'SR'}
+        currencySymbol={settings.primaryCurrencySymbol || '$'}
         onConfirmed={() => setHasActiveDay(true)}
       />
     );

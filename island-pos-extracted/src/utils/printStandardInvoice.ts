@@ -14,11 +14,12 @@ export const printStandardInvoice = (
   const isTaxFree = options?.isTaxFreeExport || !!options?.taxFreeDetails || !!transaction.taxFreeDetails;
   const taxFree = options?.taxFreeDetails || transaction.taxFreeDetails;
 
-  const primarySymbol = settings.primaryCurrencySymbol || 'SR';
-  const primaryCode = settings.primaryCurrency || 'SCR';
+  const primarySymbol = settings.primaryCurrencySymbol || '$';
+;
+  const primaryCode = settings.primaryCurrency || 'USD';
   const secondarySymbol = settings.secondaryCurrencySymbol || '$';
   const secondaryCode = settings.secondaryCurrency || 'USD';
-  const exchangeRate = settings.exchangeRate || 13.50;
+  const exchangeRate = settings.exchangeRate || 1;
   const logoUrl = settings.shopLogoUrl || settings.receiptLogoUrl || settings.brandLogoUrl;
 
   // Effective VAT rate for this transaction, blended from the actual amounts —

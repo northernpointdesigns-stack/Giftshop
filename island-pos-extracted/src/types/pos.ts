@@ -86,7 +86,7 @@ export interface SplitPaymentLine {
   currencyCode: string; // e.g. 'SCR', 'USD', 'EUR', 'GBP'
   currencySymbol: string; // e.g. 'SR', '$', '€', '£'
   amountTendered: number; // Native amount e.g. $50.00
-  exchangeRate: number; // Exchange rate vs primary currency e.g. 13.50 SCR per USD
+  exchangeRate: number; // Exchange rate vs primary currency exchanged amount of secondary currency per 1 primary unit
   amountInPrimary: number; // Converted equivalent in primary base currency e.g. 675.00 SCR
   reference?: string; // Terminal Authorization Ref / Approval Code
   note?: string; // Descriptive label e.g. "Foreign Cash (USD)" or "Barclays Visa"
@@ -269,6 +269,7 @@ export interface StoreSettings {
   taxRegistrationNumber?: string;
   adminUsername?: string;
   adminPin?: string;
+  exchangeRateUpdatedAt?: string; // ISO timestamp of the last daily-rate confirmation
 
   // Custom Corporate Branding Config
   posAppName?: string;           // Custom App Name (Default: GiftShop)
@@ -297,7 +298,7 @@ export interface StoreSettings {
   primaryCurrencySymbol?: string; // e.g., "SR"
   secondaryCurrency?: string; // e.g., "USD"
   secondaryCurrencySymbol?: string; // e.g., "$"
-  exchangeRate?: number; // 1 unit of secondary currency = X units of primary currency, e.g. 1 USD = 13.5 SCR
+  exchangeRate?: number; // 1 unit of secondary currency = X units of primary currency, set by the user daily
   allowPaymentInSecondary?: boolean;
   defaultCurrencyMode?: 'primary' | 'secondary';
   // Up to 2 extra reference currencies shown as smaller equivalents on the Customer Display

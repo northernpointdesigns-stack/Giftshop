@@ -73,8 +73,9 @@ const printTable = (title: string, headers: string[], rows: Row[]) => {
 
 export const ReportDownloads: React.FC<ReportDownloadsProps> = ({ transactions }) => {
   const settings = posDb.getSettings();
-  const symbol = settings.primaryCurrencySymbol || 'SR';
-  const code = settings.primaryCurrency || 'SCR';
+  const symbol = settings.primaryCurrencySymbol || '$';
+;
+  const code = settings.primaryCurrency || 'USD';
 
   const [dateFrom, setDateFrom] = useState(() => {
     const d = new Date();

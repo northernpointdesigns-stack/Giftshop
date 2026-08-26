@@ -5,6 +5,7 @@ import {
   ArrowRight,
   Wallet,
   CalendarDays,
+  RefreshCw,
 } from 'lucide-react';
 import { posDb } from '../../services/db';
 
@@ -16,10 +17,17 @@ interface OpeningFloatGateProps {
   onConfirmed: () => void;
 }
 
+const RATE_MAX_AGE_MS = 24 * 60 * 60 * 1000; // prompt again once per day
+
 /**
  * Welcome screen shown right after cashier sign-in.
  * The cashier MUST declare the opening cash float for the day before
  * the register becomes usable — this creates the EOD session record.
+ *
+ * If a secondary currency is configured and today's exchange rate has not
+ * been confirmed in the last 24h, a "Today's Exchange Rate" card appears
+ * alongside the float. Saving it updates settings instantly so the register,
+ * customer display, checkout and receipts all convert at the fresh rate.
  */
 export const OpeningFloatGate: React.FC<OpeningFloatGateProps> = ({
   storeName,
@@ -28,9 +36,30 @@ export const OpeningFloatGate: React.FC<OpeningFloatGateProps> = ({
   currencySymbol,
   onConfirmed,
 }) => {
+  const settings = posDb.getSettings();
+  const secCode = settings.secondaryCurrency || '';
+  const secSymbol = settings.secondaryCurrencySymbol || secCode;
+
+  // Rate prompt needed when a real second currency is configured but the
+  // stored rate is missing or was last confirmed more than 24 hours ago.
+  const rateAge = settings.exchangeRateUpdatedAt
+    ? Date.now() - new Date(settings.exchangeRateUpdatedAt).getTime()
+    : Infinity;
+  const needsRate =
+    !!secCode &&
+    secCode !== (settings.primaryCurrency || '') &&
+    (!settings.exchangeRate || settings.exchangeRate <= 0 || rateAge > RATE_MAX_AGE_MS);
+
   const [floatAmount, setFloatAmount] = useState('');
+  const [rateInput, setRateInput] = useState(
+    settings.exchangeRate && settings.exchangeRate > 0 ? String(settings.exchangeRate) : ''
+  );
   const parsed = parseFloat(floatAmount);
   const isValid = !isNaN(parsed) && parsed >= 0 && floatAmount.trim() !== '';
+
+  const parsedRate = parseFloat(rateInput);
+  const rateValid =
+    !needsRate || (!isNaN(parsedRate) && parsedRate > 0 && rateInput.trim() !== '');
 
   const today = new Date().toLocaleDateString(undefined, {
     weekday: 'long',
@@ -42,6 +71,13 @@ export const OpeningFloatGate: React.FC<OpeningFloatGateProps> = ({
   const handleConfirm = (e: React.FormEvent) => {
     e.preventDefault();
     if (!isValid) return;
+    if (!rateValid) return;
+    if (needsRate && parsedRate > 0) {
+      posDb.updateSettings({
+        exchangeRate: parsedRate,
+        exchangeRateUpdatedAt: new Date().toISOString(),
+      });
+    }
     // Creates the EOD session + drawer audit log via db layer
     posDb.openEODSession(
       Number(parsed.toFixed(2)),
@@ -126,9 +162,45 @@ export const OpeningFloatGate: React.FC<OpeningFloatGateProps> = ({
             </div>
           </div>
 
+          {/* Today's Exchange Rate card (only when due) */}
+          {needsRate && (
+            <div className="rounded-xl bg-[#0F1115] border border-cyan-500/30 p-4">
+              <label className="flex items-center gap-2 text-xs font-bold text-slate-300 mb-2 uppercase tracking-wider">
+                <RefreshCw className="w-4 h-4 text-cyan-400" />
+                Today's Exchange Rate — Recommended
+              </label>
+              <p className="text-[11px] text-slate-500 mb-3">
+                Enter today's market rate so every price, receipt and the customer display
+                converts correctly. Saved automatically for the whole shop.
+              </p>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 bg-[#161B22] border border-[#1E293B] rounded-xl px-3 py-2.5 shrink-0">
+                  <span className="text-sm font-bold text-cyan-300">{secSymbol} 1</span>
+                  <span className="text-[10px] text-slate-500 uppercase">=</span>
+                  <span className="text-sm font-bold text-emerald-300">{currencySymbol}</span>
+                </div>
+                <input
+                  type="number"
+                  step="0.0001"
+                  min="0"
+                  inputMode="decimal"
+                  value={rateInput}
+                  onChange={(e) => setRateInput(e.target.value)}
+                  placeholder="0.0000"
+                  className="flex-1 bg-[#161B22] border border-[#1E293B] rounded-xl px-4 py-2.5 font-mono font-bold text-white text-center focus:outline-none focus:border-cyan-500"
+                />
+              </div>
+              {!rateValid && (
+                <p className="text-[10px] text-amber-400 mt-2">
+                  Enter today's rate (greater than 0) to open the register.
+                </p>
+              )}
+            </div>
+          )}
+
           <button
             type="submit"
-            disabled={!isValid}
+            disabled={!isValid || !rateValid}
             className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 disabled:text-slate-500 text-white font-bold rounded-xl py-3 text-sm transition-colors flex items-center justify-center gap-2"
           >
             <Banknote className="w-4 h-4" />

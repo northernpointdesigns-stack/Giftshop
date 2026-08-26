@@ -53,11 +53,12 @@ export const ConsignmentPayoutReport: React.FC<ConsignmentPayoutReportProps> = (
   };
 
   const settings = posDb.getSettings();
-  const primarySymbol = settings.primaryCurrencySymbol || 'SR';
-  const primaryCode = settings.primaryCurrency || 'SCR';
+  const primarySymbol = settings.primaryCurrencySymbol || '$';
+;
+  const primaryCode = settings.primaryCurrency || 'USD';
   const secondarySymbol = settings.secondaryCurrencySymbol || '$';
   const secondaryCode = settings.secondaryCurrency || 'USD';
-  const exchangeRate = settings.exchangeRate || 13.50;
+  const exchangeRate = settings.exchangeRate || 1;
 
   const consignmentVendors = vendors.filter((v) => v.supplierType === 'consignment');
   const payoutCalculations = posDb.calculateConsignmentPayouts(

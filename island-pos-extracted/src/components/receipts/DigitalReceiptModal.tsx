@@ -10,6 +10,7 @@ interface DigitalReceiptModalProps {
 }
 
 const COUNTRY_CODES = [
+  { code: '', label: 'No prefix' },
   { code: '+248', label: '+248' },
   { code: '+33', label: 'France (+33)' },
   { code: '+44', label: 'United Kingdom (+44)' },
@@ -31,11 +32,12 @@ export const DigitalReceiptModal: React.FC<DigitalReceiptModalProps> = ({
   onClose,
 }) => {
   const settings = posDb.getSettings();
-  const primarySymbol = settings.primaryCurrencySymbol || 'SR';
-  const primaryCode = settings.primaryCurrency || 'SCR';
+  const primarySymbol = settings.primaryCurrencySymbol || '$';
+;
+  const primaryCode = settings.primaryCurrency || 'USD';
 
   const [countryCode, setCountryCode] = useState(
-    transaction.customerPhone?.startsWith('+') ? '' : '+248'
+    transaction.customerPhone?.startsWith('+') ? '' : ''
   );
   const [phoneNumber, setPhoneNumber] = useState(
     transaction.customerPhone
