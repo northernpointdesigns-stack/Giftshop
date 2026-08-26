@@ -11,6 +11,8 @@ import {
   Users,
   ClipboardCheck,
   Boxes,
+  Eye,
+  X,
 } from 'lucide-react';
 import { posDb } from '../../services/db';
 import { Transaction, InventoryItem, Vendor } from '../../types/pos';
@@ -22,6 +24,7 @@ interface ReportDownloadsProps {
 }
 
 type Row = (string | number)[];
+type BuiltReport = { headers: string[]; rows: Row[]; title: string };
 
 /** Escape a single CSV cell */
 const csvCell = (v: string | number): string => {
@@ -83,6 +86,7 @@ export const ReportDownloads: React.FC<ReportDownloadsProps> = ({ transactions }
     return d.toISOString().split('T')[0];
   });
   const [dateTo, setDateTo] = useState(() => new Date().toISOString().split('T')[0]);
+  const [previewReportId, setPreviewReportId] = useState<string | null>(null);
 
   // Transactions within the selected range (sales only, refunds excluded)
   const rangedTx = useMemo(
@@ -331,12 +335,12 @@ export const ReportDownloads: React.FC<ReportDownloadsProps> = ({ transactions }
     { id: 'inventory', icon: <Boxes className="w-5 h-5 text-orange-400" />, name: 'Inventory / Stock on Hand', desc: 'Current stock levels and valuation', build: buildInventory },
   ];
 
-  const handleDownload = (build: () => { headers: string[]; rows: Row[]; title: string }) => {
+  const handleDownload = (build: () => BuiltReport) => {
     const { headers, rows, title } = build();
     downloadCsv(`${title.replace(/[^a-zA-Z0-9]+/g, '_')}_${stamp()}.csv`, toCsv(headers, rows));
   };
 
-  const handlePrint = (build: () => { headers: string[]; rows: Row[]; title: string }) => {
+  const handlePrint = (build: () => BuiltReport) => {
     const { headers, rows, title } = build();
     printTable(`${title} (${dateFrom} to ${dateTo})`, headers, rows);
   };
@@ -353,6 +357,9 @@ export const ReportDownloads: React.FC<ReportDownloadsProps> = ({ transactions }
     setDateTo(new Date().toISOString().split('T')[0]);
   };
 
+  const selectedReport = previewReportId ? reports.find((report) => report.id === previewReportId) : undefined;
+  const selectedReportData = selectedReport?.build();
+
   return (
     <div className="space-y-4">
       {/* Header + date range */}
@@ -363,7 +370,7 @@ export const ReportDownloads: React.FC<ReportDownloadsProps> = ({ transactions }
               <CalendarRange className="w-5 h-5 text-emerald-400" /> Download Reports Center
             </h2>
             <p className="text-xs text-slate-400 mt-0.5">
-              Aronium-style back-office exports — pick a period, download or print any report individually
+              Pick a period, preview the figures, then decide whether to print or download
             </p>
           </div>
 
@@ -410,25 +417,78 @@ export const ReportDownloads: React.FC<ReportDownloadsProps> = ({ transactions }
                 <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">{r.desc}</p>
               </div>
             </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => handleDownload(r.build)}
-                className="flex-1 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 px-2 py-1.5 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 transition-colors"
-              >
-                <Download className="w-3 h-3" /> CSV
-              </button>
-              <button
-                onClick={() => handlePrint(r.build)}
-                className="flex-1 bg-[#0F1115] hover:bg-slate-800 text-slate-300 border border-[#1E293B] px-2 py-1.5 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 transition-colors"
-              >
-                <Printer className="w-3 h-3 text-cyan-400" /> Print
-              </button>
-            </div>
+            <button
+              onClick={() => setPreviewReportId(r.id)}
+              className="w-full bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 px-2 py-2 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1.5 transition-colors"
+            >
+              <Eye className="w-3.5 h-3.5" /> Preview report
+            </button>
           </div>
         ))}
       </div>
+
+      {/* A report is reviewed in-app first; printing/exporting is only offered
+          after the cashier has checked the selected date-range data. */}
+      {selectedReport && selectedReportData && (
+        <div className="fixed inset-0 z-50 bg-[#0F1115]/85 p-3 sm:p-6 flex items-center justify-center">
+          <div className="w-full max-w-6xl max-h-[92vh] overflow-hidden bg-[#161B22] border border-[#1E293B] rounded-2xl shadow-2xl flex flex-col">
+            <div className="flex items-start justify-between gap-4 p-4 border-b border-[#1E293B] shrink-0">
+              <div>
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <Eye className="w-4 h-4 text-emerald-400" /> {selectedReportData.title}
+                </h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  Previewing {dateFrom} to {dateTo} · {selectedReportData.rows.length} row{selectedReportData.rows.length === 1 ? '' : 's'}
+                </p>
+              </div>
+              <button
+                onClick={() => setPreviewReportId(null)}
+                className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg"
+                aria-label="Close report preview"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-auto p-4">
+              {selectedReportData.rows.length === 0 ? (
+                <div className="py-12 text-center text-sm text-slate-500">No records exist for this date range.</div>
+              ) : (
+                <div className="overflow-x-auto rounded-xl border border-[#1E293B]">
+                  <table className="w-full text-left text-xs text-slate-300">
+                    <thead className="sticky top-0 bg-[#0F1115] text-slate-400 border-b border-[#1E293B]">
+                      <tr>{selectedReportData.headers.map((header) => <th key={header} className="p-3 font-semibold whitespace-nowrap">{header}</th>)}</tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#1E293B]">
+                      {selectedReportData.rows.map((row, rowIndex) => (
+                        <tr key={rowIndex} className="hover:bg-slate-800/40">
+                          {row.map((cell, cellIndex) => <td key={cellIndex} className="p-3 whitespace-nowrap">{cell}</td>)}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 border-t border-[#1E293B] flex flex-wrap justify-end gap-2 shrink-0">
+              <button
+                onClick={() => handleDownload(selectedReport.build)}
+                className="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors"
+              >
+                <Download className="w-3.5 h-3.5" /> Download CSV
+              </button>
+              <button
+                onClick={() => handlePrint(selectedReport.build)}
+                className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors"
+              >
+                <Printer className="w-3.5 h-3.5 text-cyan-400" /> Print report
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
-
 

@@ -28,8 +28,19 @@ export const TransactionHistory: React.FC<TransactionHistoryProps> = ({
   onRefreshData,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  // Show only today's transactions by default. A store runs for years, so the
+  // ledger must never dump the full history into the DOM — a cashier widens the
+  // date range only when they actually need to inspect older days.
+  // NOTE: must be the *local* calendar date so the default matches the local
+  // date filter (a UTC key would exclude "today" around midnight / non-UTC zones).
+  const todayKey = (() => {
+    const d = new Date();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${d.getFullYear()}-${m}-${day}`;
+  })();
+  const [dateFrom, setDateFrom] = useState(todayKey);
+  const [dateTo, setDateTo] = useState(todayKey);
   const [statusFilter, setStatusFilter] = useState<'all' | 'sales' | 'refunds' | 'flagged'>('all');
   const [auditingReceiptNumber, setAuditingReceiptNumber] = useState<string | null>(null);
 
@@ -103,6 +114,12 @@ export const TransactionHistory: React.FC<TransactionHistoryProps> = ({
       return matchesStatus && matchesSearch && matchesDate;
     }).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }, [transactions, statusFilter, searchQuery, dateFrom, dateTo, auditStatusMap]);
+
+  // Even with a deliberately widened range, guard the DOM so a multi-year store
+  // never renders thousands of rows at once (perf + readability).
+  const MAX_RENDERED_ROWS = 500;
+  const visibleTransactions = filteredTransactions.slice(0, MAX_RENDERED_ROWS);
+  const capped = filteredTransactions.length > visibleTransactions.length;
 
   const handlePrintThermal = (e: React.MouseEvent, tx: Transaction) => {
     e.stopPropagation();
@@ -214,8 +231,8 @@ export const TransactionHistory: React.FC<TransactionHistoryProps> = ({
               <button
                 onClick={() => {
                   setSearchQuery('');
-                  setDateFrom('');
-                  setDateTo('');
+                  setDateFrom(todayKey);
+                  setDateTo(todayKey);
                   setStatusFilter('all');
                 }}
                 className="text-xs text-slate-400 hover:text-white px-2 py-1"
@@ -250,7 +267,7 @@ export const TransactionHistory: React.FC<TransactionHistoryProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#1E293B]">
-                {filteredTransactions.map((tx) => {
+                {visibleTransactions.map((tx) => {
                   const auditStatus = auditStatusMap.get(tx.id) || 'passed';
 
                   return (
@@ -356,6 +373,12 @@ export const TransactionHistory: React.FC<TransactionHistoryProps> = ({
                 })}
               </tbody>
             </table>
+            {capped && (
+              <div className="px-4 py-2.5 bg-amber-500/5 border-t border-[#1E293B] text-[11px] text-amber-300/90 flex items-center gap-2">
+                <Filter className="w-3.5 h-3.5 shrink-0" />
+                Showing the {MAX_RENDERED_ROWS} most recent matching receipts. Narrow your date range to see earlier records.
+              </div>
+            )}
           </div>
         )}
       </div>

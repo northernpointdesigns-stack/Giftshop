@@ -96,14 +96,14 @@ describe('ReportDownloads — download center actions', () => {
     expect(screen.getByRole('button', { name: 'All Time' })).toBeTruthy();
   });
 
-  it('downloads a CSV for each report card and honors the range preset', async () => {
+  it('previews a report before downloading its CSV and honors the range preset', async () => {
     const user = userEvent.setup();
     render(<ReportDownloads transactions={TRANSACTIONS} inventory={INVENTORY} vendors={VENDORS} />);
     await user.click(screen.getByRole('button', { name: 'All Time' }));
 
-    const csvButtons = screen.getAllByRole('button', { name: 'CSV' });
-    expect(csvButtons.length).toBeGreaterThanOrEqual(3);
-    await user.click(csvButtons[0]);
+    await user.click(screen.getAllByRole('button', { name: /preview report/i })[0]);
+    expect(screen.getByText(/previewing/i)).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: /download csv/i }));
     expect(getCapturedBlobs().length).toBe(1);
     const csv = await readBlobText(getCapturedBlobs()[0]);
     expect(csv.length).toBeGreaterThan(50);
@@ -117,7 +117,8 @@ describe('ReportDownloads — download center actions', () => {
     (window.open as ReturnType<typeof vi.fn>).mockReturnValueOnce({
       document: { write, close },
     });
-    await user.click(screen.getAllByRole('button', { name: 'Print' })[0]);
+    await user.click(screen.getAllByRole('button', { name: /preview report/i })[0]);
+    await user.click(screen.getByRole('button', { name: /print report/i }));
     expect(write).toHaveBeenCalled();
     const html = String(write.mock.calls[0][0]);
     expect(html).toContain('<table>');

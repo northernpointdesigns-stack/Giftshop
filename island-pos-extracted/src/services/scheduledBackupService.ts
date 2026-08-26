@@ -193,7 +193,7 @@ class ScheduledBackupService {
         if (downloadFormat === 'db' || downloadFormat === 'both') {
           downloadSQLiteDbFile(`${filePrefix}.db`, dbSqlContent);
         }
-        if (downloadFormat === 'json') {
+        if (downloadFormat === 'json' || downloadFormat === 'both') {
           downloadJsonBackup(`${filePrefix}.json`, jsonContent);
         }
       }

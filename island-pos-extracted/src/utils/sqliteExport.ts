@@ -59,6 +59,38 @@ function sqlEscape(val: unknown): string {
   return `'${str}'`;
 }
 
+/** UTF-8 safe base64 encode (used for the lossless restore manifest). */
+function utf8ToBase64(str: string): string {
+  const bytes = new TextEncoder().encode(str);
+  let bin = '';
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin);
+}
+
+/** UTF-8 safe base64 decode back to the original text. */
+function base64ToUtf8(b64: string): string {
+  const bin = atob(b64);
+  const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
+}
+
+/**
+ * Extracts the lossless JSON manifest embedded in an app-generated SQLite dump.
+ * Returns the parsed object, or null if the content is not a manifest dump.
+ */
+export function extractSqliteManifest(content: string): Record<string, unknown> | null {
+  const match = content.match(
+    /INSERT\s+OR\s+REPLACE\s+INTO\s+backup_manifest\s*\([^)]*\)\s*VALUES\s*\(\s*'manifest'\s*,\s*'([^']+)'\s*\)/i
+  );
+  if (!match) return null;
+  try {
+    const parsed = JSON.parse(base64ToUtf8(match[1]));
+    return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Generates a full SQLite SQL DDL and DML dump that represents the entire state
  * of the POS terminal. This file can be saved as a `.db` / `.sql` file
@@ -563,6 +595,40 @@ export function generateSQLiteDatabaseDump(data: SqliteExportPayload): string {
     }
     lines.push(``);
   }
+
+  // 14. LOSSLESS RESTORE MANIFEST
+  // The relational dump is nice for SQLite / DBeaver / DB Browser, but it only
+  // carries a subset of fields per table and the app can't rebuild every nested
+  // object from it. So we also embed the full runtime state (base64 JSON) here.
+  // importBackup() recognizes this manifest and does a complete, lossless restore
+  // from a produced .db / .sql file — not just the handful of settings columns.
+  lines.push(`-- ----------------------------------------------------------`);
+  lines.push(`-- Table structure for: backup_manifest (lossless restore payload)`);
+  lines.push(`-- ----------------------------------------------------------`);
+  lines.push(`CREATE TABLE IF NOT EXISTS backup_manifest (`);
+  lines.push(`  id TEXT PRIMARY KEY,`);
+  lines.push(`  json TEXT`);
+  lines.push(`);`);
+  lines.push(``);
+  const manifestJson = JSON.stringify({
+    app: 'The Gift Shop POS',
+    exportedAt: timestamp,
+    vendors: Array.isArray(data.vendors) ? data.vendors : [],
+    inventory: Array.isArray(data.inventory) ? data.inventory : [],
+    transactions: Array.isArray(data.transactions) ? data.transactions : [],
+    payouts: Array.isArray(data.payouts) ? data.payouts : [],
+    eodSessions: Array.isArray(data.eodSessions) ? data.eodSessions : [],
+    settings: data.settings || undefined,
+    staff: Array.isArray(data.staff) ? data.staff : [],
+    categories: Array.isArray(data.categories) ? data.categories : [],
+    drawerLogs: Array.isArray(data.drawerLogs) ? data.drawerLogs : [],
+    customers: Array.isArray(data.customers) ? data.customers : [],
+    vendorAdvances: Array.isArray(data.vendorAdvances) ? data.vendorAdvances : [],
+    invoices: Array.isArray(data.invoices) ? data.invoices : [],
+    feedback: Array.isArray(data.feedback) ? data.feedback : [],
+  });
+  lines.push(`INSERT OR REPLACE INTO backup_manifest (id, json) VALUES ('manifest', '${utf8ToBase64(manifestJson)}');`);
+  lines.push(``);
 
   lines.push(`COMMIT;`);
   lines.push(`-- Backup dump completed successfully.`);

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Banknote, FileSpreadsheet, History, Lock, Search, Unlock } from 'lucide-react';
+import { Banknote, ChevronDown, ChevronRight, FileSpreadsheet, History, Lock, Search, Unlock } from 'lucide-react';
 import { posDb } from '../../services/db';
 import type { CashDrawerEventType } from '../../types/pos';
 
@@ -16,6 +16,9 @@ export const EODBalancing: React.FC = () => {
   // Cash Drawer History Filters
   const [logFilter, setLogFilter] = useState<'all' | 'shift' | 'adjustments' | 'drops' | 'manual'>('all');
   const [logSearchQuery, setLogSearchQuery] = useState('');
+  // History can grow indefinitely. Keep every month closed until a cashier
+  // deliberately opens it, rather than making them scroll through years of logs.
+  const [expandedLogMonths, setExpandedLogMonths] = useState<Set<string>>(() => new Set());
 
   const drawerLogs = posDb.getDrawerLogs();
 
@@ -46,6 +49,33 @@ export const EODBalancing: React.FC = () => {
 
     return matchesTab && matchesSearch;
   });
+
+  const logsByMonth = filteredLogs.reduce<Record<string, typeof filteredLogs>>((groups, log) => {
+    const date = new Date(log.timestamp);
+    const key = Number.isNaN(date.getTime())
+      ? 'unknown'
+      : `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    (groups[key] ||= []).push(log);
+    return groups;
+  }, {});
+  const monthGroups = Object.entries(logsByMonth).sort(([a], [b]) => b.localeCompare(a));
+
+  const formatMonthLabel = (monthKey: string) => {
+    if (monthKey === 'unknown') return 'Undated audit entries';
+    const [year, month] = monthKey.split('-').map(Number);
+    return new Date(year, month - 1, 1).toLocaleDateString(undefined, {
+      month: 'long',
+      year: 'numeric',
+    });
+  };
+
+  const toggleMonth = (monthKey: string) => {
+    setExpandedLogMonths((current) => {
+      const next = new Set(current);
+      next.has(monthKey) ? next.delete(monthKey) : next.add(monthKey);
+      return next;
+    });
+  };
 
   // Export CSV of Drawer Logs
   const handleExportCsv = () => {
@@ -249,10 +279,35 @@ export const EODBalancing: React.FC = () => {
           </div>
         </div>
 
-        {/* Drawer Audit History Table */}
-        <div className="overflow-x-auto rounded-xl border border-[#1E293B]">
-          <table className="w-full text-left text-xs text-slate-300">
-            <thead className="bg-[#0F1115] text-slate-400 font-semibold border-b border-[#1E293B]">
+        {/* Drawer Audit History — grouped by month to keep long-lived logs compact. */}
+        <div className="space-y-2">
+          {monthGroups.length === 0 ? (
+            <div className="rounded-xl border border-[#1E293B] p-8 text-center text-slate-500 text-xs">
+              No cash drawer logs match your current filter criteria.
+            </div>
+          ) : monthGroups.map(([monthKey, logs]) => {
+            const isExpanded = expandedLogMonths.has(monthKey);
+            return (
+              <section key={monthKey} className="rounded-xl border border-[#1E293B] overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => toggleMonth(monthKey)}
+                  aria-expanded={isExpanded}
+                  className="w-full flex items-center justify-between gap-3 bg-[#0F1115] hover:bg-slate-800/70 px-3.5 py-3 text-left transition-colors"
+                >
+                  <span className="flex items-center gap-2 text-xs font-bold text-slate-200">
+                    {isExpanded ? <ChevronDown className="w-4 h-4 text-emerald-400" /> : <ChevronRight className="w-4 h-4 text-slate-500" />}
+                    {formatMonthLabel(monthKey)}
+                  </span>
+                  <span className="rounded-full bg-slate-800 border border-slate-700 px-2 py-0.5 text-[10px] font-mono text-slate-400">
+                    {logs.length} {logs.length === 1 ? 'entry' : 'entries'}
+                  </span>
+                </button>
+
+                {isExpanded && (
+                  <div className="overflow-x-auto border-t border-[#1E293B]">
+                    <table className="w-full text-left text-xs text-slate-300">
+                      <thead className="bg-[#0F1115] text-slate-400 font-semibold border-b border-[#1E293B]">
               <tr>
                 <th className="p-3">Timestamp</th>
                 <th className="p-3">Event Type</th>
@@ -261,16 +316,9 @@ export const EODBalancing: React.FC = () => {
                 <th className="p-3 text-right">Drawer Float After</th>
                 <th className="p-3">Reason / Audit Note</th>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-[#1E293B] bg-[#161B22]">
-              {filteredLogs.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="p-8 text-center text-slate-500 text-xs">
-                    No cash drawer logs match your current filter criteria.
-                  </td>
-                </tr>
-              ) : (
-                filteredLogs.map((log) => {
+                      </thead>
+                      <tbody className="divide-y divide-[#1E293B] bg-[#161B22]">
+                        {logs.map((log) => {
                   const isPositive = log.eventType === 'paid_in' || log.eventType === 'open';
                   const isNegative = log.eventType === 'paid_out' || log.eventType === 'cash_drop';
 
@@ -315,10 +363,14 @@ export const EODBalancing: React.FC = () => {
                       </td>
                     </tr>
                   );
-                })
-              )}
-            </tbody>
-          </table>
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </section>
+            );
+          })}
         </div>
       </div>
 

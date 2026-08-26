@@ -18,7 +18,7 @@ import {
   CashRegisterTerminal,
 } from '../types/pos';
 import { ParsedCsvRow } from './csvParser';
-import { generateSQLiteDatabaseDump } from '../utils/sqliteExport';
+import { generateSQLiteDatabaseDump, extractSqliteManifest } from '../utils/sqliteExport';
 import { scheduledBackupService } from './scheduledBackupService';
 import { offlineSyncEngine } from './offlineSyncEngine';
 import { DEFAULT_BARCODE_RULES } from '../utils/barcodeEngine';
@@ -560,13 +560,21 @@ class PosDatabase {
   public importBackup(content: string): { ok: boolean; error?: string } {
     try {
       const trimmed = content.trim();
-      
+
       // Check for binary SQLite database header
       if (trimmed.startsWith('SQLite format 3') || content.includes('\u0001\u0002')) {
-        return { 
-          ok: false, 
-          error: 'Binary SQLite .db files cannot be parsed directly in browser storage. Please upload your JSON backup file or use the quick currency selector above.' 
+        return {
+          ok: false,
+          error: 'Binary SQLite .db files cannot be parsed directly in browser storage. Please upload your JSON backup file or use the quick currency selector above.',
         };
+      }
+
+      // This app's own .db/.sql dumps carry a lossless JSON manifest, so a file
+      // produced at till close (or a manual SQLite export) restores in full —
+      // not just the settings columns.
+      const manifest = extractSqliteManifest(trimmed);
+      if (manifest) {
+        return this.applyFullBackup(manifest);
       }
 
       // Try parsing as JSON
@@ -574,7 +582,7 @@ class PosDatabase {
       try {
         data = JSON.parse(content);
       } catch (jsonErr) {
-        // If not valid JSON, check if it's a SQL text dump
+        // If not valid JSON, check if it's a legacy SQL text dump
         if (trimmed.includes('INSERT INTO') || trimmed.includes('store_settings')) {
           const settingsUpdates: Record<string, any> = {};
           const settingRegex = /INSERT(?:\s+OR\s+REPLACE)?\s+INTO\s+store_settings\s*\([^)]*\)\s*VALUES\s*\(\s*'([^']+)'\s*,\s*('[^']*'|[\d.-]+|NULL)\s*,/gi;
@@ -619,6 +627,18 @@ class PosDatabase {
         return { ok: true };
       }
 
+      return this.applyFullBackup(data);
+    } catch (err: any) {
+      return { ok: false, error: `Failed to import backup: ${err.message || String(err)}` };
+    }
+  }
+
+  /**
+   * Restores every dataset from a full backup payload (JSON backup, or the
+   * lossless manifest embedded in this app's SQLite dump).
+   */
+  private applyFullBackup(data: { [key: string]: any; settings?: any }): { ok: boolean; error?: string } {
+    try {
       if (Array.isArray(data.vendors)) this.vendors = data.vendors;
       if (Array.isArray(data.inventory)) this.inventory = data.inventory;
       if (Array.isArray(data.transactions)) this.transactions = data.transactions;

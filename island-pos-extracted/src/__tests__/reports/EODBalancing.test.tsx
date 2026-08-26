@@ -28,6 +28,8 @@ describe('EODBalancing — drawer history & session ledger', () => {
     const user = userEvent.setup();
     render(<EODBalancing />);
     expect(screen.getByText(/All Events \(4\)/)).toBeTruthy();
+    // Audit records are compact by default; open the current month to review it.
+    await user.click(screen.getByRole('button', { name: /4 entries/ }));
 
     await user.click(screen.getByRole('button', { name: /Safe Drops/ }));
     expect(screen.getByText(/Safe drop/)).toBeTruthy();
@@ -44,9 +46,21 @@ describe('EODBalancing — drawer history & session ledger', () => {
   it('searches drawer logs by staff and reason', async () => {
     const user = userEvent.setup();
     render(<EODBalancing />);
+    await user.click(screen.getByRole('button', { name: /4 entries/ }));
     await user.type(screen.getByPlaceholderText(/search/i), 'Bob');
     expect(screen.getByText(/Change fund top-up/)).toBeTruthy();
     expect(screen.queryByText(/Safe drop/)).toBeNull(); // Alice
+  });
+
+  it('keeps monthly drawer audit sections collapsed until opened', async () => {
+    const user = userEvent.setup();
+    render(<EODBalancing />);
+    const month = screen.getByRole('button', { name: /4 entries/ });
+    expect(month.getAttribute('aria-expanded')).toBe('false');
+    expect(screen.queryByText(/Change fund top-up/)).toBeNull();
+    await user.click(month);
+    expect(month.getAttribute('aria-expanded')).toBe('true');
+    expect(screen.getByText(/Change fund top-up/)).toBeTruthy();
   });
 
   it('exports drawer history CSV with currency-correct headers', async () => {

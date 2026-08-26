@@ -124,7 +124,14 @@ export const AutoBackupModal: React.FC<AutoBackupModalProps> = ({
         `Are you sure you want to restore data from backup taken on ${new Date(snap.timestamp).toLocaleString()}?\n\nThis will replace current inventory, transactions, and settings with this snapshot.`
       )
     ) {
-      const res = posDb.importBackup(snap.jsonContent);
+      // Prefer the lossless JSON payload; older snapshots may only have the
+      // .db dump, which still contains a full restore manifest after the fix.
+      const content = snap.jsonContent || snap.dbSqlContent;
+      if (!content) {
+        setStatusMessage({ text: 'Restore failed: this snapshot has no backup payload.', type: 'error' });
+        return;
+      }
+      const res = posDb.importBackup(content);
       if (res.ok) {
         onRefreshData();
         setStatusMessage({ text: 'Database successfully restored from snapshot!', type: 'success' });
