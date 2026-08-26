@@ -22,3 +22,9 @@ BoutiquePOS-0.0.0.snap*
 
 # Logs
 *.log
+
+# Unrelated / external artifacts — this repo is island-pos only
+dont touch/
+island-pos-extracted/pos-main/
+oracleJdk-26.jdk/
+islandpos-*.zip
