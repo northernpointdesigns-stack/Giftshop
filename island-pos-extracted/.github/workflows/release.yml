@@ -11,11 +11,12 @@ on:
 permissions:
   contents: write
 
-# Owner builds: pushes/PRs against the 'owner' branch set this flag, which
-# strips the 14-day trial timer and activation gate from the built apps.
-# Builds from any other branch/tag keep the normal customer trial flow.
+# Unlock flag: set the repo variable VITE_DISABLE_LICENSE=1 (Settings →
+# Secrets and variables → Actions → Variables) to strip the 14-day trial
+# timer and activation gate from the built apps. Repos without the variable
+# keep the normal customer trial flow. The same workflow works in both.
 env:
-  VITE_DISABLE_LICENSE: ${{ github.ref_name == 'owner' && '1' || '0' }}
+  VITE_DISABLE_LICENSE: ${{ vars.VITE_DISABLE_LICENSE || '0' }}
 
 jobs:
   desktop:
