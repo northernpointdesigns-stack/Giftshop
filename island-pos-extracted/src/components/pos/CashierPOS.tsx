@@ -1493,6 +1493,7 @@ export const CashierPOS: React.FC<CashierPOSProps> = ({
           subtotal={netSubtotal}
           tax={roundedVat}
           discount={discountAmount}
+          itemMarkdowns={itemDiscountTotal}
           discountType={discountType}
           discountValue={discountValue}
           total={grandTotal}

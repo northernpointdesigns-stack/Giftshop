@@ -30,7 +30,7 @@ import { Customer, InventoryItem, PaymentMethod, SplitPaymentLine, Transaction, 
 import { posDb } from '../../services/db';
 import { soundService } from '../../services/audio';
 import { customerChannel } from '../../services/customerChannel';
-import { getMultiCurrencyEquivalents } from '../../utils/currencyAndMath';
+import { computeOrderVerification, getMultiCurrencyEquivalents } from '../../utils/currencyAndMath';
 
 interface CheckoutModalProps {
   cart: {
@@ -45,6 +45,8 @@ interface CheckoutModalProps {
   subtotal: number;
   tax: number;
   discount: number;
+  /** Damaged-goods markdown total (from calculateCartTotals.itemDiscountTotal). */
+  itemMarkdowns?: number;
   discountType?: 'amount' | 'percent';
   discountValue?: number;
   total: number;
@@ -65,6 +67,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   subtotal,
   tax,
   discount,
+  itemMarkdowns = 0,
   discountType = 'amount',
   discountValue,
   total,
@@ -144,26 +147,29 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const splitChangeDuePrimary = Math.max(0, Number((totalPaidInPrimary - total).toFixed(2)));
   const isSplitInsufficient = paymentMethod === 'split' && totalPaidInPrimary < total - 0.01;
 
-  // Dynamic Calculations for Order Summary & Tax Savings Block
-  const originalRetailSubtotal = cart.reduce((sum, c) => sum + (c.item.retailPrice * c.quantity), 0);
-  const lineItemDiscounts = Math.max(0, originalRetailSubtotal - subtotal);
-  const totalDiscountApplied = lineItemDiscounts + discount;
-
-  // Estimated Tax Rate (e.g. VAT 15%)
-  const taxableBase = Math.max(0.01, subtotal - discount);
-  const estimatedTaxRate = taxableBase > 0 ? tax / taxableBase : 0.15;
-  const taxSavingsFromDiscounts = totalDiscountApplied * estimatedTaxRate;
-
-  // Tourist VAT Tax-Free Exemption (Net refund if tax-free export is checked)
-  const touristVatRefundNet = Number((tax * 0.90).toFixed(2));
-  const potentialTaxSavings = taxSavingsFromDiscounts + (isTaxFreeNeeded ? touristVatRefundNet : 0);
-
-  // Total Savings Math
-  const totalCombinedSavings = totalDiscountApplied + potentialTaxSavings;
-  const grossValueBeforeSavings = originalRetailSubtotal + (originalRetailSubtotal * estimatedTaxRate);
-  const overallSavingsPercent = grossValueBeforeSavings > 0
-    ? Math.min(100, Math.round((totalCombinedSavings / grossValueBeforeSavings) * 100))
-    : 0;
+  // Dynamic Calculations for Order Summary & Verification Block
+  // -------------------------------------------------------------------
+  // `subtotal` is the NET subtotal and `tax` the ACTUAL VAT — both come
+  // straight from calculateCartTotals in CashierPOS. When VAT-inclusive
+  // pricing is enabled, the shelf prices ALREADY contain VAT, so the
+  // embedded VAT must never be reported as a discount or a "saving".
+  // Only real reductions (markdowns + manual discounts) count.
+  const vatInclusive = settings.vatInclusive === true;
+  const shelfValue = Number(
+    cart
+      .reduce((sum, c) => sum + (c.resolvedPrice ?? c.item.retailPrice) * c.quantity, 0)
+      .toFixed(2)
+  );
+  const verification = computeOrderVerification({
+    shelfValue,
+    markdowns: itemMarkdowns,
+    manualDiscount: discount,
+    vat: tax,
+    total,
+    vatInclusive,
+    defaultVatRate: settings.defaultVatRate,
+  });
+  const { totalDiscount: totalDiscountApplied, effectiveVatRate } = verification;
 
   // Get active currency details for line entry
   const getActiveSplitCurrencyDetails = () => {
@@ -1111,82 +1117,82 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
             {/* Metric Cards Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              {/* 1. Total Discount Applied */}
+              {/* 1. Total Discount Applied (real reductions only) */}
               <div className="bg-[#161B22] p-2.5 rounded-lg border border-[#1E293B] space-y-1">
                 <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium">
                   <span className="flex items-center gap-1">
                     <Tag className="w-3 h-3 text-amber-400" /> Total Discount:
                   </span>
-                  {totalDiscountApplied > 0 && (
+                  {verification.hasDiscounts && (
                     <span className="text-amber-400 font-bold font-mono">
-                      -{primarySymbol} {totalDiscountApplied.toFixed(2)}
+                      -{primarySymbol} {verification.totalDiscount.toFixed(2)}
                     </span>
                   )}
                 </div>
-                <div className="text-base font-black font-mono text-amber-400">
-                  {primarySymbol} {totalDiscountApplied.toFixed(2)}
+                <div className={`text-base font-black font-mono ${verification.hasDiscounts ? 'text-amber-400' : 'text-slate-500'}`}>
+                  {primarySymbol} {verification.totalDiscount.toFixed(2)}
                 </div>
                 <div className="text-[9.5px] text-slate-500 space-y-0.5 font-mono">
-                  {lineItemDiscounts > 0 && (
-                    <div className="truncate">• Line/Promo: {primarySymbol} {lineItemDiscounts.toFixed(2)}</div>
+                  {itemMarkdowns > 0 && (
+                    <div className="truncate">• Damaged/Markdown: {primarySymbol} {itemMarkdowns.toFixed(2)}</div>
                   )}
                   {discount > 0 && (
                     <div className="truncate">
                       • Manual Disc ({discountType === 'percent' ? `${discountValue}%` : 'Fixed'}): {primarySymbol} {discount.toFixed(2)}
                     </div>
                   )}
-                  {totalDiscountApplied === 0 && (
+                  {!verification.hasDiscounts && (
                     <div className="text-slate-600 italic">No discounts applied</div>
                   )}
                 </div>
               </div>
 
-              {/* 2. Potential Tax Savings */}
+              {/* 2. VAT — the actual tax in this sale (never a "saving") */}
               <div className="bg-[#161B22] p-2.5 rounded-lg border border-[#1E293B] space-y-1">
                 <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium">
                   <span className="flex items-center gap-1">
-                    <ShieldCheck className="w-3 h-3 text-cyan-400" /> Tax Savings:
+                    <Percent className="w-3 h-3 text-cyan-400" /> VAT / Tax:
                   </span>
                   <span className="text-cyan-400 font-bold font-mono">
-                    {(estimatedTaxRate * 100).toFixed(0)}% VAT Rate
+                    {parseFloat((effectiveVatRate * 100).toFixed(1))}% Rate
                   </span>
                 </div>
                 <div className="text-base font-black font-mono text-cyan-400">
-                  {primarySymbol} {potentialTaxSavings.toFixed(2)}
+                  {primarySymbol} {tax.toFixed(2)}
                 </div>
                 <div className="text-[9.5px] text-slate-500 space-y-0.5 font-mono">
                   <div className="truncate">
-                    • Saved from Discounts: {primarySymbol} {taxSavingsFromDiscounts.toFixed(2)}
+                    {vatInclusive
+                      ? `• Included in shelf prices`
+                      : `• Added on top of prices`}
                   </div>
-                  {isTaxFreeNeeded ? (
+                  {isTaxFreeNeeded && tax > 0 && (
                     <div className="truncate text-blue-300 font-semibold">
-                      ✈️ Tourist VAT Refund: {primarySymbol} {touristVatRefundNet.toFixed(2)}
-                    </div>
-                  ) : (
-                    <div className="truncate text-slate-600">
-                      (Tourist VAT refund available if enabled)
+                      ✈️ Tourist refund est.: {primarySymbol} {verification.touristRefundEstimate.toFixed(2)}
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* 3. Combined Overall Savings */}
+              {/* 3. Total Savings — real money off the tagged prices */}
               <div className="bg-[#161B22] p-2.5 rounded-lg border border-[#1E293B] space-y-1">
                 <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium">
                   <span className="flex items-center gap-1">
                     <PiggyBank className="w-3 h-3 text-emerald-400" /> Total Savings:
                   </span>
-                  {overallSavingsPercent > 0 && (
+                  {verification.hasDiscounts && (
                     <span className="text-emerald-400 font-bold font-mono bg-emerald-500/10 px-1.5 py-0.2 rounded border border-emerald-500/20">
-                      {overallSavingsPercent}% Saved
+                      {verification.savingsPercent}% Saved
                     </span>
                   )}
                 </div>
-                <div className="text-base font-black font-mono text-emerald-400">
-                  {primarySymbol} {totalCombinedSavings.toFixed(2)}
+                <div className={`text-base font-black font-mono ${verification.hasDiscounts ? 'text-emerald-400' : 'text-slate-500'}`}>
+                  {primarySymbol} {verification.totalSavings.toFixed(2)}
                 </div>
                 <div className="text-[9.5px] text-slate-500 font-mono">
-                  Combined Discount + Tax Savings Overall
+                  {verification.hasDiscounts
+                    ? 'Total reductions off tagged prices'
+                    : 'Tagged prices paid — no reductions'}
                 </div>
               </div>
             </div>
@@ -1197,13 +1203,15 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 <Info className="w-4 h-4 text-emerald-400 shrink-0" />
                 <div>
                   <div className="font-bold text-white flex items-center gap-1.5">
-                    <span>Pre-Discount Retail Value:</span>
-                    <span className="font-mono text-slate-400 line-through">
-                      {primarySymbol} {grossValueBeforeSavings.toFixed(2)}
+                    <span>Tagged Price Value:</span>
+                    <span className={`font-mono ${verification.hasDiscounts ? 'text-slate-400 line-through' : 'text-white'}`}>
+                      {primarySymbol} {shelfValue.toFixed(2)}
                     </span>
                   </div>
                   <div className="text-[10px] text-slate-400">
-                    Verify final amount with customer before tendering register
+                    {verification.hasDiscounts
+                      ? 'Verify final amount with customer before tendering register'
+                      : 'No discounts — customer pays the tagged prices'}
                   </div>
                 </div>
               </div>

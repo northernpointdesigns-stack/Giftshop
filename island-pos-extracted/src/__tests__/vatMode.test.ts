@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateCartTotals } from '../utils/currencyAndMath';
+import { calculateCartTotals, computeOrderVerification } from '../utils/currencyAndMath';
 import type { InventoryItem } from '../types/pos';
 
 const item = {
@@ -34,5 +34,99 @@ describe('VAT modes', () => {
     const t = calculateCartTotals(cart, 'percent', 10, 0.15, 13.5, true);
     expect(t.grandTotal).toBe(180); // 10% off tagged 200
     expect(t.netSubtotal + t.vatTotal).toBeCloseTo(t.grandTotal, 2);
+  });
+});
+
+describe('computeOrderVerification — checkout summary math', () => {
+  it('REGRESSION: VAT-inclusive sale with no discounts reports zero discount/savings (no phantom SR 32.61, no fake SR 287.50)', () => {
+    // The exact scenario from the field report: SR 250 payable, VAT-inclusive 15%.
+    // Embedded VAT = 250 - 250/1.15 = 32.61 — old code reported it as a discount.
+    const v = computeOrderVerification({
+      shelfValue: 250,
+      markdowns: 0,
+      manualDiscount: 0,
+      vat: 32.61,
+      total: 250,
+      vatInclusive: true,
+      defaultVatRate: 0.15,
+    });
+    expect(v.totalDiscount).toBe(0);
+    expect(v.totalSavings).toBe(0);
+    expect(v.hasDiscounts).toBe(false);
+    expect(v.savingsPercent).toBe(0);
+    expect(v.effectiveVatRate).toBeCloseTo(0.15, 2);
+  });
+
+  it('exclusive mode with a real manual discount counts only the actual discount', () => {
+    // Shelf 200 net, 10 off, VAT 15% added -> total 218.50, VAT 28.50
+    const v = computeOrderVerification({
+      shelfValue: 200,
+      markdowns: 0,
+      manualDiscount: 10,
+      vat: 28.5,
+      total: 218.5,
+      vatInclusive: false,
+      defaultVatRate: 0.15,
+    });
+    expect(v.totalDiscount).toBe(10);
+    expect(v.totalSavings).toBe(10);
+    expect(v.hasDiscounts).toBe(true);
+    expect(v.savingsPercent).toBe(5);
+    expect(v.effectiveVatRate).toBeCloseTo(0.15, 2);
+  });
+
+  it('damaged-goods markdown counts as a real discount in inclusive mode', () => {
+    // Shelf 100, 50% damaged markdown -> pays 50 (VAT-inclusive), embedded VAT 6.52
+    const v = computeOrderVerification({
+      shelfValue: 100,
+      markdowns: 50,
+      manualDiscount: 0,
+      vat: 6.52,
+      total: 50,
+      vatInclusive: true,
+      defaultVatRate: 0.15,
+    });
+    expect(v.totalDiscount).toBe(50);
+    expect(v.savingsPercent).toBe(50);
+    expect(v.effectiveVatRate).toBeCloseTo(0.15, 2);
+  });
+
+  it('tourist refund estimate is 90% of the actual VAT', () => {
+    const v = computeOrderVerification({
+      shelfValue: 250,
+      markdowns: 0,
+      manualDiscount: 0,
+      vat: 32.61,
+      total: 250,
+      vatInclusive: true,
+      defaultVatRate: 0.15,
+    });
+    expect(v.touristRefundEstimate).toBeCloseTo(29.35, 2);
+  });
+
+  it('reports the truthful 0% when the sale genuinely carries no VAT', () => {
+    const v = computeOrderVerification({
+      shelfValue: 100,
+      markdowns: 0,
+      manualDiscount: 0,
+      vat: 0,
+      total: 100,
+      vatInclusive: false,
+      defaultVatRate: 0.15,
+    });
+    expect(v.effectiveVatRate).toBe(0); // nothing charged — display 0%, not the default
+  });
+
+  it('falls back to the default rate only in the degenerate empty-total case', () => {
+    const v = computeOrderVerification({
+      shelfValue: 0,
+      markdowns: 0,
+      manualDiscount: 0,
+      vat: 0,
+      total: 0,
+      vatInclusive: false,
+      defaultVatRate: 0.15,
+    });
+    expect(v.effectiveVatRate).toBeCloseTo(0.15, 2);
   });
 });

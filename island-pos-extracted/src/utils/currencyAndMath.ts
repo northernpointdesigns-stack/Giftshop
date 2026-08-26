@@ -182,6 +182,73 @@ export function computeVatAmount(amount: number, rate: number, vatInclusive: boo
   }
   return Number((amount * rate).toFixed(2));
 }
+/**
+ * Order verification math for the checkout/payment screen.
+ *
+ * Critical invariant: VAT is NEVER a discount. When VAT-inclusive pricing is
+ * enabled the shelf prices already contain the tax, so the embedded VAT must
+ * not be reported as money "saved". Only real reductions — damaged-goods
+ * markdowns and manual order discounts — count as discounts/savings.
+ */
+export interface OrderVerificationInput {
+  /** Tagged-price total (resolved price × quantity, before any reduction). */
+  shelfValue: number;
+  /** Damaged-goods markdown total (a real discount). */
+  markdowns: number;
+  /** Manual order-level discount (a real discount). */
+  manualDiscount: number;
+  /** Actual VAT amount for the cart (from calculateCartTotals). */
+  vat: number;
+  /** Grand total the customer pays (net + VAT in BOTH modes). */
+  total: number;
+  /** Whether VAT-inclusive pricing is enabled in settings. */
+  vatInclusive: boolean;
+  /** Fallback rate used only when the total carries no VAT at all. */
+  defaultVatRate?: number;
+}
+
+export interface OrderVerification {
+  /** Real money off shelf prices (markdowns + manual discount). */
+  totalDiscount: number;
+  /** VAT ÷ net — the effective rate across the cart. */
+  effectiveVatRate: number;
+  /** 90% of VAT — estimate shown only when tourist tax-free export is ticked. */
+  touristRefundEstimate: number;
+  /** Same as totalDiscount — savings can only come from real reductions. */
+  totalSavings: number;
+  /** totalSavings as a percent of the shelf value (0–100). */
+  savingsPercent: number;
+  /** Convenience flag: any real discount present? */
+  hasDiscounts: boolean;
+}
+
+export function computeOrderVerification(input: OrderVerificationInput): OrderVerification {
+  const totalDiscount = roundMoney(Math.max(0, (input.markdowns || 0) + (input.manualDiscount || 0)));
+
+  // net + VAT = total holds in both exclusive and inclusive modes.
+  const net = Math.max(0, roundMoney(input.total - input.vat));
+  const fallback =
+    input.defaultVatRate && input.defaultVatRate > 0 ? input.defaultVatRate : 0.15;
+  const effectiveVatRate = net > 0.005 ? Math.max(0, input.vat) / net : fallback;
+
+  const touristRefundEstimate =
+    input.vat > 0 ? Number((Math.max(0, input.vat) * 0.9).toFixed(2)) : 0;
+
+  const totalSavings = totalDiscount;
+  const savingsPercent =
+    input.shelfValue > 0
+      ? Math.min(100, Math.round((totalSavings / input.shelfValue) * 100))
+      : 0;
+
+  return {
+    totalDiscount,
+    effectiveVatRate,
+    touristRefundEstimate,
+    totalSavings,
+    savingsPercent,
+    hasDiscounts: totalDiscount > 0.005,
+  };
+}
 
 /**
  * Formats a currency amount with symbol and code
