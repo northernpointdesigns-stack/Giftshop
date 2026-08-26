@@ -10,7 +10,7 @@ interface DigitalReceiptModalProps {
 }
 
 const COUNTRY_CODES = [
-  { code: '+248', label: 'Seychelles (+248)' },
+  { code: '+248', label: '+248' },
   { code: '+33', label: 'France (+33)' },
   { code: '+44', label: 'United Kingdom (+44)' },
   { code: '+49', label: 'Germany (+49)' },

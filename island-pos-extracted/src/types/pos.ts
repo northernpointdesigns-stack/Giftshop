@@ -3,7 +3,7 @@ export type SupplierType = 'wholesale' | 'consignment';
 export interface Vendor {
   id: string;
   name: string;
-  brandName?: string; // e.g. "Ocean Seychelles", "Souvenir Boutique"
+  brandName?: string; // e.g. "Acme Gifts", "Souvenir Boutique"
   contactName: string;
   email: string;
   phone: string;
@@ -17,7 +17,7 @@ export interface Vendor {
 export interface InventoryItem {
   id: string;
   name: string;
-  brand?: string; // e.g. "Ocean Seychelles", "Souvenir Boutique"
+  brand?: string; // e.g. "Acme Gifts", "Souvenir Boutique"
   category: string; // e.g. "T-Shirts", "Mugs", "Bags", "Pareos", "Soaps"
   productLine?: string; // e.g. "Luxury Line", "Normal Line", "Beachwear"
   size?: string; // e.g. "Kids S", "Adults M", "Women L", "12oz"

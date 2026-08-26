@@ -430,7 +430,7 @@ export const CustomerDisplay: React.FC<CustomerDisplayProps> = ({
               <Sparkles className="w-3.5 h-3.5" /> {appName} Island Authenticity Guarantee
             </div>
             <p className="text-[11px] text-slate-400">
-              Original hand-crafted apparel, local spices, boutique jewelry, and Seychelles gifts.
+              Original hand-crafted apparel, local spices, boutique jewelry, and local gifts.
             </p>
           </div>
         </div>

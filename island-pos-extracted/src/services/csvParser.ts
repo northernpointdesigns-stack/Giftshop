@@ -182,12 +182,10 @@ export function parseCsvWithAdvancedMapping(
 
     // Auto-detect Brand if missing
     if (!brand) {
-      if (lowerName.includes('ocean') || lowerName.includes('seychelles')) {
-        brand = 'Ocean Seychelles';
-      } else if (lowerName.includes('souvenir') || lowerName.includes('boutique')) {
+      if (lowerName.includes('souvenir')) {
         brand = 'Souvenir Boutique';
       } else {
-        brand = 'Ocean Seychelles';
+        brand = 'Unbranded';
       }
     }
     if (!vendorName) vendorName = brand;
@@ -332,20 +330,20 @@ export function processCsvToInventoryRows(csvText: string): ParsedCsvRow[] {
 }
 
 /**
- * Sample CSV for Ocean Seychelles Products
+ * Sample Catalog CSV Template
  */
-export const SAMPLE_OCEAN_SEYCHELLES_CSV = `Brand,Item Name,Group Category,Product Line,Size Target,Barcode SKU,Retail Price,Cost Basis,Stock Qty,VAT Rate %
-Ocean Seychelles,Ocean Seychelles T-Shirt - Turtle Cove,T-Shirts,Beach Heritage,Adults - Medium,893100101,25.00,12.50,30,15%
-Ocean Seychelles,Ocean Seychelles T-Shirt - Turtle Cove,T-Shirts,Beach Heritage,Women - Small,893100102,25.00,12.50,22,15%
-Ocean Seychelles,Ocean Seychelles T-Shirt - Turtle Cove,T-Shirts,Beach Heritage,Kids - Large,893100103,18.00,9.00,15,15%
-Ocean Seychelles,Ocean Seychelles T-Shirt - Anse Source d'Argent,T-Shirts,Island Paradise,Adults - Large,893100104,28.00,14.00,25,15%
-Ocean Seychelles,Ocean Seychelles T-Shirt - Anse Source d'Argent,T-Shirts,Island Paradise,Women - Medium,893100105,28.00,14.00,18,15%
-Ocean Seychelles,Ocean Seychelles T-Shirt - Coco de Mer Heritage,T-Shirts,Botanical Line,Adults - XL,893100106,30.00,15.00,12,15%
-Ocean Seychelles,Ocean Seychelles T-Shirt - Coco de Mer Heritage,T-Shirts,Botanical Line,Women - Small,893100107,30.00,15.00,10,15%
-Ocean Seychelles,Ocean Seychelles T-Shirt - Praslin Sunset,T-Shirts,Sunset Collection,Kids - Medium,893100108,18.00,9.00,14,15%
-Ocean Seychelles,Ocean Seychelles T-Shirt - Mahé Coral Reef,T-Shirts,Marine Life,Adults - Medium,893100109,26.00,13.00,20,15%
-Ocean Seychelles,Ocean Seychelles Ceramic Mug - Luxury Gold Rim Line,Mugs,Luxury Line,12oz Gold,893100201,18.00,8.00,24,15%
-Ocean Seychelles,Ocean Seychelles Ceramic Mug - Normal Standard Line,Mugs,Normal Line,11oz Ceramic,893100202,12.00,5.00,40,15%
+export const SAMPLE_CATALOG_CSV = `Brand,Item Name,Group Category,Product Line,Size Target,Barcode SKU,Retail Price,Cost Basis,Stock Qty,VAT Rate %
+Sample Brand,Sample Brand T-Shirt - Turtle Cove,T-Shirts,Beach Heritage,Adults - Medium,893100101,25.00,12.50,30,15%
+Sample Brand,Sample Brand T-Shirt - Turtle Cove,T-Shirts,Beach Heritage,Women - Small,893100102,25.00,12.50,22,15%
+Sample Brand,Sample Brand T-Shirt - Turtle Cove,T-Shirts,Beach Heritage,Kids - Large,893100103,18.00,9.00,15,15%
+Sample Brand,Sample Brand T-Shirt - Anse Source d'Argent,T-Shirts,Island Paradise,Adults - Large,893100104,28.00,14.00,25,15%
+Sample Brand,Sample Brand T-Shirt - Anse Source d'Argent,T-Shirts,Island Paradise,Women - Medium,893100105,28.00,14.00,18,15%
+Sample Brand,Sample Brand T-Shirt - Coco de Mer Heritage,T-Shirts,Botanical Line,Adults - XL,893100106,30.00,15.00,12,15%
+Sample Brand,Sample Brand T-Shirt - Coco de Mer Heritage,T-Shirts,Botanical Line,Women - Small,893100107,30.00,15.00,10,15%
+Sample Brand,Sample Brand T-Shirt - Praslin Sunset,T-Shirts,Sunset Collection,Kids - Medium,893100108,18.00,9.00,14,15%
+Sample Brand,Sample Brand T-Shirt - Mahé Coral Reef,T-Shirts,Marine Life,Adults - Medium,893100109,26.00,13.00,20,15%
+Sample Brand,Sample Brand Ceramic Mug - Luxury Gold Rim Line,Mugs,Luxury Line,12oz Gold,893100201,18.00,8.00,24,15%
+Sample Brand,Sample Brand Ceramic Mug - Normal Standard Line,Mugs,Normal Line,11oz Ceramic,893100202,12.00,5.00,40,15%
 `;
 
 /**

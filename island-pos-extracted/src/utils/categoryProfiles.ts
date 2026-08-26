@@ -78,7 +78,7 @@ export const DEFAULT_CATEGORY_PRESETS: CategoryPreset[] = [
     defaultProductLine: 'Beach Heritage',
     variantLabel: 'Design / Artwork / Color',
     variantPlaceholder: 'e.g. Turtle Cove, Coco de Mer, Sunset Palm',
-    commonVariants: ['Turtle Cove', 'Coco de Mer Silhouette', 'Aldabra Giant', 'Sunset Beach', 'Vintage Seychelles', 'Ocean Palm', 'Classic Logo Navy'],
+    commonVariants: ['Turtle Cove', 'Coco de Mer Silhouette', 'Aldabra Giant', 'Sunset Beach', 'Vintage Island', 'Ocean Palm', 'Classic Logo Navy'],
   },
   {
     id: 'preset_pareos',
@@ -98,7 +98,7 @@ export const DEFAULT_CATEGORY_PRESETS: CategoryPreset[] = [
     defaultProductLine: 'Artisan Souvenirs',
     variantLabel: 'Motif / Shape',
     variantPlaceholder: 'e.g. Coco de Mer, Giant Tortoise, Island Map',
-    commonVariants: ['Coco de Mer', 'Giant Tortoise', 'Seychelles Map', 'Dolphin', 'Granite Rock', 'Seychelles Flag'],
+    commonVariants: ['Coco de Mer', 'Giant Tortoise', 'Island Map', 'Dolphin', 'Granite Rock', 'Flag Crest'],
     commonMaterials: ['Carved Hardwood', 'Polished Coconut Shell', 'Pewter Metal', 'Resin & Sand', 'Acrylic'],
   },
   {
@@ -109,7 +109,7 @@ export const DEFAULT_CATEGORY_PRESETS: CategoryPreset[] = [
     defaultProductLine: 'Boutique Drinkware',
     variantLabel: 'Artwork / Graphic Theme',
     variantPlaceholder: 'e.g. Granite Boulders, Giant Tortoise, Sunset Cove',
-    commonVariants: ['Granite Boulders', 'Giant Tortoise', 'Sunset Cove', 'Seychelles Flag Crest', 'Coco de Mer Art', 'Island Latitude'],
+    commonVariants: ['Granite Boulders', 'Giant Tortoise', 'Sunset Cove', 'Flag Crest Emblem', 'Coco de Mer Art', 'Island Latitude'],
     commonMaterials: ['Gloss Ceramic', 'Matte Stoneware', 'Enamel Campfire', 'Stainless Steel', 'Glass'],
     commonVolumes: ['330ml (11oz)', '450ml (15oz)', '500ml', '750ml'],
   },

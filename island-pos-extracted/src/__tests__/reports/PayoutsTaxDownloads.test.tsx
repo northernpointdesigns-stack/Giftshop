@@ -19,7 +19,7 @@ describe('ConsignmentPayoutReport — statements, itemized view & history', () =
     render(<ConsignmentPayoutReport vendors={VENDORS} onRefreshData={noop} />);
     expect(screen.getAllByText(/Souvenir Boutique/).length).toBeGreaterThan(0);
     // Historical payout record from the database
-    expect(screen.getByText('SR 15.40')).toBeTruthy();
+    expect(screen.getAllByText('SR 15.40').length).toBeGreaterThan(0);
   });
 
   it('filters to a single vendor via the dropdown', async () => {
@@ -57,18 +57,26 @@ describe('TaxReturnAssistant — pre-filled books & exports', () => {
     await user.click(screen.getByRole('button', { name: /^csv$/i }));
     expect(getCapturedBlobs().length).toBe(1);
     const csv = await readBlobText(getCapturedBlobs()[0]);
-    expect(csv).toContain('TAX_RETURN');
+    expect(csv).toContain('UNIVERSAL INDIVIDUAL INCOME TAX RETURN');
+    // Print opens a print preview window and writes the return into it
+    const write = vi.fn();
+    const close = vi.fn();
+    (window.open as ReturnType<typeof vi.fn>).mockReturnValueOnce({
+      document: { write, close },
+    });
     await user.click(screen.getByRole('button', { name: /print return/i }));
-    expect(window.print).toHaveBeenCalled();
+    expect(write).toHaveBeenCalled();
+    expect(String(write.mock.calls[0][0])).toContain('TAX');
   });
 
   it('accepts taxpayer edits', async () => {
     const user = userEvent.setup();
     render(<TaxReturnAssistant transactions={TRANSACTIONS} />);
-    const yearInput = screen.getByDisplayValue(String(new Date().getFullYear()));
+    // The worksheet defaults to the PREVIOUS fiscal year
+    const yearInput = screen.getByDisplayValue(String(new Date().getFullYear() - 1));
     await user.clear(yearInput);
-    await user.type(yearInput, '2025');
-    expect((yearInput as HTMLInputElement).value).toBe('2025');
+    await user.type(yearInput, '2024');
+    expect((yearInput as HTMLInputElement).value).toBe('2024');
   });
 });
 
@@ -101,10 +109,17 @@ describe('ReportDownloads — download center actions', () => {
     expect(csv.length).toBeGreaterThan(50);
   });
 
-  it('print action routes through window.print', async () => {
+  it('print action opens the print preview with the report table', async () => {
     const user = userEvent.setup();
     render(<ReportDownloads transactions={TRANSACTIONS} inventory={INVENTORY} vendors={VENDORS} />);
+    const write = vi.fn();
+    const close = vi.fn();
+    (window.open as ReturnType<typeof vi.fn>).mockReturnValueOnce({
+      document: { write, close },
+    });
     await user.click(screen.getAllByRole('button', { name: 'Print' })[0]);
-    expect(window.print).toHaveBeenCalled();
+    expect(write).toHaveBeenCalled();
+    const html = String(write.mock.calls[0][0]);
+    expect(html).toContain('<table>');
   });
 });

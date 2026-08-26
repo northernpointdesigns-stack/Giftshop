@@ -1802,7 +1802,7 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
                       type="text"
                       value={newStaffName}
                       onChange={(e) => setNewStaffName(e.target.value)}
-                      placeholder="e.g. Marie-Claire Seychelles"
+                      placeholder="e.g. Marie-Claire Fontaine"
                       className="w-full bg-[#0F1115] border border-[#1E293B] rounded-xl px-3 py-2 text-xs text-[#E2E8F0] focus:outline-none focus:border-emerald-500"
                       required
                     />
@@ -2589,7 +2589,7 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
                   <FileSpreadsheet className="w-4 h-4 text-amber-400" /> Quick Catalog Presets (Import Template Pills)
                 </h4>
                 <p className="text-[10px] text-slate-400 leading-relaxed mt-0.5">
-                  Customize template titles (e.g., replace or edit default presets like "Ocean Seychelles" or "Souvenir Boutique"), sample catalog CSV items, and download presets for your shop.
+                  Customize template titles, sample catalog CSV items, and download presets for your shop.
                 </p>
               </div>
               <button
@@ -2838,7 +2838,7 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
                       type="text"
                       value={settings.storeName || ''}
                       onChange={(e) => setSettings({ ...settings, storeName: e.target.value })}
-                      placeholder="e.g. Seychelles Island Boutique"
+                      placeholder="e.g. Your Store"
                       className="w-full bg-[#0F1115] border border-[#1E293B] rounded-xl px-3 py-2 text-xs text-[#E2E8F0] focus:outline-none focus:border-emerald-500 font-bold"
                     />
                   </div>
@@ -2851,7 +2851,7 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
                       type="text"
                       value={settings.receiptHeaderSubtitle || ''}
                       onChange={(e) => setSettings({ ...settings, receiptHeaderSubtitle: e.target.value })}
-                      placeholder="e.g. Official Retailer • Ocean Seychelles"
+                      placeholder="e.g. Official Retailer • House Brand"
                       className="w-full bg-[#0F1115] border border-[#1E293B] rounded-xl px-3 py-2 text-xs text-[#E2E8F0] focus:outline-none focus:border-emerald-500"
                     />
                   </div>
@@ -2865,7 +2865,7 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
                     rows={3}
                     value={headerLinesText}
                     onChange={(e) => setHeaderLinesText(e.target.value)}
-                    placeholder="Victoria Promenade, Mahé, Seychelles&#10;Tel: +248 4 321 900 • Email: info@oceanseychelles.sc"
+                    placeholder="123 Harbour Road&#10;Tel: +000 000 0000 • Email: info@yourstore.com"
                     className="w-full bg-[#0F1115] border border-[#1E293B] rounded-xl px-3 py-2 text-xs font-mono text-[#E2E8F0] focus:outline-none focus:border-emerald-500"
                   />
                   <span className="text-[10px] text-slate-400">
@@ -2901,7 +2901,7 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
                     type="text"
                     value={settings.receiptFooterMessage || ''}
                     onChange={(e) => setSettings({ ...settings, receiptFooterMessage: e.target.value })}
-                    placeholder="e.g. Thank you for visiting Seychelles Island Boutique!"
+                    placeholder="e.g. Thank you for visiting our boutique!"
                     className="w-full bg-[#0F1115] border border-[#1E293B] rounded-xl px-3 py-2 text-xs text-[#E2E8F0] focus:outline-none focus:border-emerald-500 font-semibold"
                   />
                 </div>
@@ -2927,7 +2927,7 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
                     rows={3}
                     value={footerLinesText}
                     onChange={(e) => setFooterLinesText(e.target.value)}
-                    placeholder="Follow us on Instagram @oceanseychelles&#10;www.oceanseychelles.sc"
+                    placeholder="Follow us on Instagram @yourstore&#10;www.yourstore.com"
                     className="w-full bg-[#0F1115] border border-[#1E293B] rounded-xl px-3 py-2 text-xs font-mono text-[#E2E8F0] focus:outline-none focus:border-emerald-500"
                   />
                 </div>

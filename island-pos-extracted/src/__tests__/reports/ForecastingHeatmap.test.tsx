@@ -32,9 +32,10 @@ describe('SalesForecasting — reorder engine & CSV export', () => {
     ]) {
       expect(screen.getByText(name)).toBeTruthy();
     }
-    // Vendor-resolved supplier type, not a price==cost guess
-    expect(screen.getAllByText(/Ocean Seychelles Ltd/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/Souvenir Boutique/).length).toBeGreaterThan(0);
+    // Vendor-resolved supplier type is asserted in the CSV export test.
+    // Rows render the item brand (with Unbranded fallback), not the vendor name.
+    expect(screen.getAllByText(/Unbranded/).length).toBeGreaterThan(0); // keychain
+    expect(screen.getAllByText(/Souvenir Boutique/).length).toBeGreaterThan(0); // tote brand
   });
 
   it('search filter narrows the forecast list', async () => {
@@ -66,7 +67,7 @@ describe('SalesForecasting — reorder engine & CSV export', () => {
     await user.click(screen.getByRole('button', { name: /Export Order Guide/i }));
     const blobs = getCapturedBlobs();
     expect(blobs.length).toBe(1);
-    const csv = decodeURIComponent(await readBlobText(blobs[0]));
+    const csv = await readBlobText(blobs[0]);
     expect(csv).toContain('Supplier Type');
     expect(csv).toContain('893200101'); // tote
     expect(csv).toContain('Consignment');
@@ -95,32 +96,32 @@ describe('SalesHeatmap — views, metrics, timeframes & export', () => {
 
   it('renders the default heatmap grid', () => {
     renderHeatmap();
-    expect(screen.getByRole('button', { name: /heatmap/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Day × Hour Matrix/i })).toBeTruthy();
     // Metric switcher present
-    expect(screen.getByRole('button', { name: /^revenue$/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Gross Sales/i })).toBeTruthy();
   });
 
   it('switches every metric option', async () => {
     const user = userEvent.setup();
     renderHeatmap();
-    await user.click(screen.getByRole('button', { name: /^transactions$/i }));
-    await user.click(screen.getByRole('button', { name: /^units$/i }));
-    await user.click(screen.getByRole('button', { name: /avg ticket/i }));
-    await user.click(screen.getByRole('button', { name: /^revenue$/i }));
+    await user.click(screen.getByRole('button', { name: /Orders Count/i }));
+    await user.click(screen.getByRole('button', { name: /Units Sold/i }));
+    await user.click(screen.getByRole('button', { name: /Avg Basket/i }));
+    await user.click(screen.getByRole('button', { name: /Gross Sales/i }));
   });
 
   it('switches every view mode including the live month calendar', async () => {
     const user = userEvent.setup();
     renderHeatmap();
-    await user.click(screen.getByRole('button', { name: /calendar/i }));
+    await user.click(screen.getByRole('button', { name: /Monthly Calendar/i }));
     const monthName = new Date().toLocaleString('default', {
       month: 'long',
       year: 'numeric',
     });
     expect(screen.getByText(monthName)).toBeTruthy();
-    await user.click(screen.getByRole('button', { name: /hourly/i }));
-    await user.click(screen.getByRole('button', { name: /day of week/i }));
-    await user.click(screen.getByRole('button', { name: /^heatmap$/i }));
+    await user.click(screen.getByRole('button', { name: /Hourly Velocity/i }));
+    await user.click(screen.getByRole('button', { name: /Day Breakdown/i }));
+    await user.click(screen.getByRole('button', { name: /Day × Hour Matrix/i }));
   });
 
   it('changes the timeframe selection', async () => {

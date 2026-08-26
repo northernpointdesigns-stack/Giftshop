@@ -128,7 +128,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
               )}
 
               <div className="font-bold text-base uppercase tracking-wider">
-                {settings.storeName || 'Seychelles Island Boutique'}
+                {settings.storeName || 'Your Store'}
               </div>
 
               {settings.receiptHeaderSubtitle && (

@@ -443,12 +443,12 @@ export const EXPECTED_TODAY = {
   consignmentGross: 22,
   consignmentPayout: 15.4,
   consignmentCommission: 6.6,
-  oceanBrandGross: 51.5,
-  oceanBrandUnits: 3,
+  oceanBrandGross: 43.0, // 50 + 18 − 25 refund (keychain is Unbranded: no brand field)
+  oceanBrandUnits: 2,
   souvenirBrandGross: 22,
   peakWindow: '10:00 – 11:00',
   peakRevenue: 68.0,
-  fxSecondaryGross: '5.44', // 73.5 / 13.5 (snapshot rate)
+  fxSecondaryGross: '5.12', // blended snapshot rate: 73.5 / (84.53 blended @13.5) = 14.35
   allTimeTxCount: 5,
   weekTxCount: 3,
 };

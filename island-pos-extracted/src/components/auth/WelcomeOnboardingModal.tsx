@@ -240,7 +240,7 @@ export const WelcomeOnboardingModal: React.FC<WelcomeOnboardingModalProps> = ({
                   type="text"
                   value={storeName}
                   onChange={(e) => setStoreName(e.target.value)}
-                  placeholder="e.g. Ocean Seychelles Boutique"
+                  placeholder="e.g. Harbour Boutique"
                   className="w-full bg-[#161B22] border border-[#1E293B] rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-emerald-500"
                 />
               </div>

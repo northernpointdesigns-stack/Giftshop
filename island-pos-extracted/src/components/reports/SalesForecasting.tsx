@@ -290,27 +290,29 @@ export const SalesForecasting: React.FC<SalesForecastingProps> = ({
 
   // Export Forecasting & Reorders to CSV
   const handleExportCSV = () => {
-    let csvContent = 'data:text/csv;charset=utf-8,';
-    csvContent += 'SKU,Item Name,Category,Brand,Current Stock,Min Threshold,Days Remaining,Historical Units Sold,Daily Velocity,Projected 30D Demand,Safety Buffer %,Safety Stock Target,Suggested Re-order Qty,Unit Cost Basis,Total Re-order Cost,Supplier Type,Vendor\n';
+    // Use a Blob download (consistent with every other exporter in the app).
+    // Data URIs break on large catalogs and bypass the standard download path.
+    const csvBody = 'SKU,Item Name,Category,Brand,Current Stock,Min Threshold,Days Remaining,Historical Units Sold,Daily Velocity,Projected 30D Demand,Safety Buffer %,Safety Stock Target,Suggested Re-order Qty,Unit Cost Basis,Total Re-order Cost,Supplier Type,Vendor\n' +
+      forecastedItems.map((item) => {
+        const vendor = vendors.find((v) => v.id === item.vendorId);
+        const vendorName = vendor?.name || 'Unknown';
+        const supplierType = vendor?.supplierType === 'consignment' ? 'Consignment' : 'Wholesale';
+        const cleanName = item.name.replace(/,/g, ' ');
+        const cleanBrand = (item.brand || 'Unbranded').replace(/,/g, ' ');
+        const cleanCategory = item.category.replace(/,/g, ' ');
 
-    forecastedItems.forEach((item) => {
-      const vendor = vendors.find((v) => v.id === item.vendorId);
-      const vendorName = vendor?.name || 'Unknown';
-      const supplierType = vendor?.supplierType === 'consignment' ? 'Consignment' : 'Wholesale';
-      const cleanName = item.name.replace(/,/g, ' ');
-      const cleanBrand = (item.brand || 'Unbranded').replace(/,/g, ' ');
-      const cleanCategory = item.category.replace(/,/g, ' ');
+        return `${item.sku},"${cleanName}","${cleanCategory}","${cleanBrand}",${item.stockLevel},${item.minStockThreshold},${item.daysRemaining === 999 ? '30+' : item.daysRemaining},${item.unitsSold},${item.dailyVelocity.toFixed(3)},${item.forecasted30DayDemand.toFixed(1)},${(safetyBuffer * 100).toFixed(0)}%,${item.targetStockLevel},${item.suggestedOrder},${item.costBasis.toFixed(2)},${item.totalCostBasis.toFixed(2)},${supplierType},"${vendorName}"\n`;
+      }).join('');
 
-      csvContent += `${item.sku},"${cleanName}","${cleanCategory}","${cleanBrand}",${item.stockLevel},${item.minStockThreshold},${item.daysRemaining === 999 ? '30+' : item.daysRemaining},${item.unitsSold},${item.dailyVelocity.toFixed(3)},${item.forecasted30DayDemand.toFixed(1)},${(safetyBuffer * 100).toFixed(0)}%,${item.targetStockLevel},${item.suggestedOrder},${item.costBasis.toFixed(2)},${item.totalCostBasis.toFixed(2)},${supplierType},"${vendorName}"\n`;
-    });
-
-    const encodedUri = encodeURI(csvContent);
+    const blob = new Blob([csvBody], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `Seychelles_Inventory_Forecasting_Report_${historicalDays}d.csv`);
+    link.href = url;
+    link.setAttribute('download', `Inventory_Forecasting_Report_${historicalDays}d.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
     showToast('Procurement forecasting advisory report exported successfully!');
   };
 

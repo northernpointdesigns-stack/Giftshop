@@ -273,7 +273,7 @@ export const CustomerLookupModal: React.FC<CustomerLookupModalProps> = ({
                       type="email"
                       value={regEmail}
                       onChange={(e) => setRegEmail(e.target.value)}
-                      placeholder="annette@seychelles.sc"
+                      placeholder="customer@example.com"
                       className="w-full bg-[#161B22] border border-[#1E293B] rounded-xl px-3.5 py-2.5 text-xs text-[#E2E8F0] focus:outline-none focus:border-emerald-500"
                     />
                   </div>
@@ -303,7 +303,7 @@ export const CustomerLookupModal: React.FC<CustomerLookupModalProps> = ({
                     rows={3}
                     value={regNotes}
                     onChange={(e) => setRegNotes(e.target.value)}
-                    placeholder="e.g. Prefers Ocean Seychelles T-shirts, local artisan crafts..."
+                    placeholder="e.g. Prefers eco-friendly gifts, artisan crafts..."
                     className="w-full bg-[#161B22] border border-[#1E293B] rounded-xl px-3.5 py-2.5 text-xs text-[#E2E8F0] focus:outline-none focus:border-emerald-500"
                   />
                 </div>
@@ -510,7 +510,7 @@ export const CustomerLookupModal: React.FC<CustomerLookupModalProps> = ({
                                     <div className="text-[10px] text-slate-500 font-mono">SKU: {p.sku}</div>
                                   </td>
                                   <td className="p-3">
-                                    <span className="text-slate-300 font-semibold">{p.brand || 'Seychelles'}</span>
+                                    <span className="text-slate-300 font-semibold">{p.brand || 'Unbranded'}</span>
                                     <div className="text-[10px] text-slate-400">{p.category}</div>
                                   </td>
                                   <td className="p-3 text-center font-bold">{p.quantity}</td>

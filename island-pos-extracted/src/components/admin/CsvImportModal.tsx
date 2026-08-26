@@ -39,8 +39,8 @@ interface CsvImportModalProps {
 
 // Database fields available for CSV Header mapping
 const TARGET_DB_FIELDS: { id: keyof FieldMapping; label: string; required?: boolean; description: string }[] = [
-  { id: 'name', label: 'Item Name / Description', required: true, description: 'Product title (e.g. Ocean Seychelles T-Shirt - Turtle Cove)' },
-  { id: 'brand', label: 'Brand Name', description: 'Brand line (e.g. Ocean Seychelles, Souvenir Boutique)' },
+  { id: 'name', label: 'Item Name / Description', required: true, description: 'Product title (e.g. Classic Cotton T-Shirt - Wave Print)' },
+  { id: 'brand', label: 'Brand Name', description: 'Brand line (e.g. Acme Gifts, Souvenir Boutique)' },
   { id: 'category', label: 'Group Category', description: 'Product category (e.g. T-Shirts, Mugs, Bags, Pareos)' },
   { id: 'productLine', label: 'Product Line / Tier', description: 'Sub-line (e.g. Beach Heritage, Luxury Line, Normal Line)' },
   { id: 'size', label: 'Size / Target Fit', description: 'Size demographic (e.g. Adults - Medium, Kids - Large, Women - Small)' },

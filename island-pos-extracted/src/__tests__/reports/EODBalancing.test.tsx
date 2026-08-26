@@ -15,12 +15,13 @@ describe('EODBalancing — drawer history & session ledger', () => {
     // Closed session: float 100, cash sales 200, expected 280, actual 278
     expect(screen.getByText('SR 280.00')).toBeTruthy();
     expect(screen.getByText('SR 278.00')).toBeTruthy();
-    expect(screen.getAllByText('SR 100.00').length).toBe(2); // both sessions
-    expect(screen.getByText(/\+SR200\.00/)).toBeTruthy();
+    // Both session floats + the "Shift opened" drawer log entry
+    expect(screen.getAllByText('SR 100.00').length).toBe(3);
+    expect(screen.getByText('+SR 200.00')).toBeTruthy();
     // Adjustments: +20 paid in -10 paid out -30 drop = -20
-    expect(screen.getByText('SR-20.00')).toBeTruthy();
+    expect(screen.getByText('-SR 20.00')).toBeTruthy();
     // Disparity
-    expect(screen.getByText('SR-2.00')).toBeTruthy();
+    expect(screen.getByText('-SR 2.00')).toBeTruthy();
   });
 
   it('filter pills narrow the drawer log list', async () => {
@@ -57,6 +58,6 @@ describe('EODBalancing — drawer history & session ledger', () => {
     const csv = await readBlobText(blobs[0]);
     expect(csv).toContain('Amount (SR)');
     expect(csv).toContain('Drawer Float After (SR)');
-    expect(csv).toContain('SAFE_DROP');
+    expect(csv).toContain('CASH_DROP');
   });
 });

@@ -1880,7 +1880,7 @@ export const InventoryAdmin: React.FC<InventoryAdminProps> = ({
                       list="brand-options"
                       value={formData.brand}
                       onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
-                      placeholder="e.g. Ocean Seychelles"
+                      placeholder="e.g. Acme Gifts"
                       className="w-full bg-[#161B22] border border-[#1E293B] rounded-lg px-3 py-1.5 text-xs text-[#E2E8F0] focus:outline-none focus:border-emerald-500 font-medium"
                     />
                     <datalist id="brand-options">
@@ -2293,7 +2293,7 @@ export const InventoryAdmin: React.FC<InventoryAdminProps> = ({
                   required
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="e.g. Ocean Seychelles T-Shirt - Turtle Cove (Adult Male - M)"
+                  placeholder="e.g. Acme Gifts T-Shirt - Turtle Cove (Adult Male - M)"
                   className="w-full bg-[#161B22] border border-[#1E293B] rounded-lg px-3 py-2 text-xs text-[#E2E8F0] font-medium focus:outline-none focus:border-emerald-500"
                 />
               </div>

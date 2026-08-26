@@ -449,7 +449,7 @@ export const printStandardInvoice = (
                 ? `<img src="${logoUrl}" class="store-logo" alt="Store Logo" />`
                 : ''
             }
-            <h1 class="store-name">${settings.storeName || 'Seychelles Island Boutique'}</h1>
+            <h1 class="store-name">${settings.storeName || 'Your Store'}</h1>
             ${settings.receiptHeaderSubtitle ? `<div class="store-subtitle">${settings.receiptHeaderSubtitle}</div>` : ''}
             <div class="store-lines">
               ${settings.receiptHeaderLines?.map((line) => `<div>${line}</div>`).join('') || ''}

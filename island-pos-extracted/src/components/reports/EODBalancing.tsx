@@ -301,7 +301,7 @@ export const EODBalancing: React.FC = () => {
                         {log.eventType === 'manual_open'
                           ? `${primarySymbol} 0.00`
                           : log.amount !== undefined
-                          ? `${isPositive ? '+' : isNegative ? '-' : ''}${primarySymbol}${log.amount.toFixed(2)}`
+                          ? `${isPositive ? '+' : isNegative ? '-' : ''}${primarySymbol} ${Math.abs(log.amount).toFixed(2)}`
                           : '—'}
                       </td>
                       <td className="p-3 text-right font-mono font-medium text-slate-300 whitespace-nowrap">
@@ -353,18 +353,18 @@ export const EODBalancing: React.FC = () => {
                     </td>
                     <td className="p-3 text-right font-mono">{primarySymbol} {s.startingFloat.toFixed(2)}</td>
                     <td className="p-3 text-right font-mono text-emerald-400">
-                      +{primarySymbol}{s.cashSales.toFixed(2)}
+                      +{primarySymbol} {s.cashSales.toFixed(2)}
                     </td>
                     <td
                       className={`p-3 text-right font-mono ${
                         adjSum < 0 ? 'text-amber-400' : adjSum > 0 ? 'text-blue-400' : 'text-slate-500'
                       }`}
                     >
-                      {adjSum === 0 ? `${primarySymbol} 0.00` : `${adjSum > 0 ? '+' : ''}${primarySymbol}${adjSum.toFixed(2)}`}
+                      {adjSum === 0 ? `${primarySymbol} 0.00` : `${adjSum > 0 ? '+' : '-'}${primarySymbol} ${Math.abs(adjSum).toFixed(2)}`}
                     </td>
                     <td className="p-3 text-right font-mono font-bold">{primarySymbol} {s.expectedCash.toFixed(2)}</td>
                     <td className="p-3 text-right font-mono">
-                      {s.actualCash !== undefined ? `${primarySymbol}${s.actualCash.toFixed(2)}` : '—'}
+                      {s.actualCash !== undefined ? `${primarySymbol} ${s.actualCash.toFixed(2)}` : '—'}
                     </td>
                     <td
                       className={`p-3 text-right font-mono font-bold ${
@@ -376,7 +376,7 @@ export const EODBalancing: React.FC = () => {
                       }`}
                     >
                       {s.cashDifference !== undefined
-                        ? `${s.cashDifference >= 0 ? '+' : ''}${primarySymbol}${s.cashDifference.toFixed(2)}`
+                        ? `${s.cashDifference >= 0 ? '+' : '-'}${primarySymbol} ${Math.abs(s.cashDifference).toFixed(2)}`
                         : '—'}
                     </td>
                     <td className="p-3">

@@ -104,7 +104,7 @@ export const DigitalReceiptHub: React.FC<DigitalReceiptHubProps> = ({
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-[#1E293B] pb-6">
           <div className="text-center sm:text-left space-y-1">
             <div className="text-[10px] text-emerald-400 font-black uppercase tracking-widest flex items-center justify-center sm:justify-start gap-1">
-              <Award className="w-3.5 h-3.5" /> {settings.removeIslandBranding ? (settings.posAppName || settings.storeName || 'Premium Client Portal') : (settings.storeName || 'Seychelles Artisan Hub')}
+              <Award className="w-3.5 h-3.5" /> {settings.removeIslandBranding ? (settings.posAppName || settings.storeName || 'Premium Client Portal') : (settings.storeName || 'Rewards Hub')}
             </div>
             <h1 className="text-2xl font-black text-white tracking-tight">
               Customer Portal
@@ -137,7 +137,7 @@ export const DigitalReceiptHub: React.FC<DigitalReceiptHubProps> = ({
             {/* Simulated Receipt Header */}
             <div className="text-center py-2 space-y-1 bg-[#0F1115] rounded-xl p-4 border border-[#1E293B]/50">
               <div className="font-extrabold text-sm uppercase text-slate-200">
-                {settings.storeName || 'Seychelles Island Boutique'}
+                {settings.storeName || 'Your Store'}
               </div>
               <div className="text-[10px] text-slate-500">
                 {settings.receiptHeaderSubtitle || 'Premium Handcrafted Products'}
@@ -353,7 +353,7 @@ export const DigitalReceiptHub: React.FC<DigitalReceiptHubProps> = ({
 
                 <div className="pt-4 flex justify-center gap-1.5 text-[11px] text-slate-500">
                   <Heart className="w-3.5 h-3.5 text-rose-500 fill-rose-500" />
-                  <span>{settings.removeIslandBranding ? `Thank you for shopping with ${settings.storeName || 'us'}` : 'Made in Seychelles with Love'}</span>
+                  <span>{settings.removeIslandBranding ? `Thank you for shopping with ${settings.storeName || 'us'}` : 'Thank you for your visit!'}</span>
                 </div>
               </div>
             )}
