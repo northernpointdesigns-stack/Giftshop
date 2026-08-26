@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateCartTotals, computeOrderVerification } from '../utils/currencyAndMath';
+import { calculateCartTotals, computeOrderVerification, computeTouristRefund, resolveTransactionVat } from '../utils/currencyAndMath';
 import type { InventoryItem } from '../types/pos';
 
 const item = {
@@ -128,5 +128,49 @@ describe('computeOrderVerification — checkout summary math', () => {
       defaultVatRate: 0.15,
     });
     expect(v.effectiveVatRate).toBeCloseTo(0.15, 2);
+  });
+});
+
+describe('computeTouristRefund / resolveTransactionVat — tourist VAT math', () => {
+  it('deducts the admin fee from the actual VAT (default 10%)', () => {
+    const r = computeTouristRefund(32.61);
+    expect(r.adminFeeAmount).toBe(3.26);
+    expect(r.netRefundAmount).toBe(29.35);
+  });
+
+  it('supports a custom fee percentage', () => {
+    const r = computeTouristRefund(30, 20);
+    expect(r.adminFeeAmount).toBe(6);
+    expect(r.netRefundAmount).toBe(24);
+  });
+
+  it('never returns a refund from zero VAT', () => {
+    const r = computeTouristRefund(0);
+    expect(r.grossVat).toBe(0);
+    expect(r.netRefundAmount).toBe(0);
+  });
+
+  it('REGRESSION: respects a stored VAT of exactly 0 (no invented refund on VAT-exempt sales)', () => {
+    const vat = resolveTransactionVat({ vatTotal: 0, tax: 0, total: 250 }, 0.15, true);
+    expect(vat).toBe(0); // old code fell through to gross*0.15 = 37.50 phantom refund
+  });
+
+  it('REGRESSION: legacy record without stored VAT extracts embedded VAT in inclusive mode', () => {
+    // gross 250 VAT-inclusive @15% -> embedded VAT is 32.61, NOT 250*0.15=37.50
+    const vat = resolveTransactionVat({ total: 250 }, 0.15, true);
+    expect(vat).toBeCloseTo(32.61, 2);
+  });
+
+  it('legacy record without stored VAT adds VAT in exclusive mode', () => {
+    const vat = resolveTransactionVat({ total: 250 }, 0.15, false);
+    expect(vat).toBeCloseTo(37.5, 2);
+  });
+
+  it('checkout estimate matches the certificate payout to the cent', () => {
+    // The estimate quoted at checkout must equal what the certificate prints.
+    const paidVat = 32.61;
+    const estimate = computeTouristRefund(paidVat).netRefundAmount;
+    const certificate = computeTouristRefund(paidVat, 10).netRefundAmount;
+    expect(estimate).toBe(certificate);
   });
 });

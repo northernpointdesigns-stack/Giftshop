@@ -3,6 +3,7 @@ import { X, Plane, FileText, Printer, CheckCircle2, ShieldCheck, DollarSign, Awa
 import { TaxFreeDetails, Transaction } from '../../types/pos';
 import { posDb } from '../../services/db';
 import { printStandardInvoice } from '../../utils/printStandardInvoice';
+import { computeTouristRefund, resolveTransactionVat } from '../../utils/currencyAndMath';
 import { printThermalReceipt } from '../../utils/printThermalReceipt';
 
 interface TaxFreeExportModalProps {
@@ -63,11 +64,20 @@ export const TaxFreeExportModal: React.FC<TaxFreeExportModalProps> = ({
   );
   const [adminFeePercent, setAdminFeePercent] = useState<number>(10); // 10% admin processing fee
 
-  // VAT calculations
+  // VAT calculations — single source of truth shared with the checkout
+  // estimate. A stored VAT of 0 is respected (zero-VAT sale → zero refund,
+  // never invented); legacy records without a stored VAT are computed from
+  // the configured store rate, correctly extracting embedded VAT when
+  // VAT-inclusive pricing is enabled.
+  const totalVat = resolveTransactionVat(
+    transaction,
+    settings.defaultVatRate ?? 0.15,
+    settings.vatInclusive === true
+  );
+  const refund = computeTouristRefund(totalVat, adminFeePercent);
   const totalGross = transaction.total;
-  const totalVat = transaction.vatTotal || transaction.tax || totalGross * 0.15;
-  const adminFeeAmount = Number((totalVat * (adminFeePercent / 100)).toFixed(2));
-  const netRefundAmount = Number((totalVat - adminFeeAmount).toFixed(2));
+  const adminFeeAmount = refund.adminFeeAmount;
+  const netRefundAmount = refund.netRefundAmount;
 
   const buildTaxFreeObject = (): TaxFreeDetails => {
     const certRef = existing?.certificateRef || `TF-${transaction.receiptNumber.replace(/^[A-Z]+-?/, '')}`;

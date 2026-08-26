@@ -232,7 +232,7 @@ export function computeOrderVerification(input: OrderVerificationInput): OrderVe
   const effectiveVatRate = net > 0.005 ? Math.max(0, input.vat) / net : fallback;
 
   const touristRefundEstimate =
-    input.vat > 0 ? Number((Math.max(0, input.vat) * 0.9).toFixed(2)) : 0;
+    input.vat > 0 ? computeTouristRefund(input.vat).netRefundAmount : 0;
 
   const totalSavings = totalDiscount;
   const savingsPercent =
@@ -248,6 +248,48 @@ export function computeOrderVerification(input: OrderVerificationInput): OrderVe
     savingsPercent,
     hasDiscounts: totalDiscount > 0.005,
   };
+}
+
+/**
+ * Tourist VAT tax-free export refund math — the SINGLE source of truth.
+ * Both the checkout estimate and the Tax-Free Export certificate use this,
+ * so the cashier's quoted figure and the printed payout can never drift
+ * (not even by one cent).
+ *
+ * Refund = VAT actually paid, minus a processing fee (default 10%).
+ */
+export interface TouristRefund {
+  /** The VAT amount the refund is calculated from. */
+  grossVat: number;
+  /** Processing fee retained (feePercent of the VAT). */
+  adminFeeAmount: number;
+  /** What the tourist actually receives. */
+  netRefundAmount: number;
+}
+
+export function computeTouristRefund(vat: number, feePercent: number = 10): TouristRefund {
+  const grossVat = Math.max(0, roundMoney(vat || 0));
+  const adminFeeAmount = Number((grossVat * (feePercent / 100)).toFixed(2));
+  const netRefundAmount = Number((grossVat - adminFeeAmount).toFixed(2));
+  return { grossVat, adminFeeAmount, netRefundAmount };
+}
+
+/**
+ * Safely resolves the VAT amount of a transaction for refund purposes.
+ * - Prefers the stored vatTotal/tax (exact, from calculateCartTotals).
+ * - A stored 0 is respected (zero-VAT sale → zero refund, never invented).
+ * - Legacy records with neither field fall back to computing from the
+ *   gross total with the store's configured rate, correctly extracting
+ *   the embedded VAT when VAT-inclusive pricing is enabled.
+ */
+export function resolveTransactionVat(
+  transaction: { vatTotal?: number; tax?: number; total: number },
+  defaultVatRate: number,
+  vatInclusive: boolean
+): number {
+  if (typeof transaction.vatTotal === 'number') return transaction.vatTotal;
+  if (typeof transaction.tax === 'number') return transaction.tax;
+  return computeVatAmount(transaction.total, defaultVatRate, vatInclusive);
 }
 
 /**
