@@ -14,6 +14,10 @@ permissions:
 
 env:
   RELEASE_BUILD: ${{ startsWith(github.ref, 'refs/tags/v') }}
+  # Unlock flag: set repo VARIABLE VITE_DISABLE_LICENSE=1 (Settings → Secrets
+  # and variables → Actions → Variables) to strip the 14-day trial gate from
+  # the built apps. Repos without the variable keep the customer trial flow.
+  VITE_DISABLE_LICENSE: ${{ vars.VITE_DISABLE_LICENSE || '0' }}
 
 jobs:
   desktop:
@@ -33,6 +37,16 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v5
+
+      - name: Configure license mode
+        shell: bash
+        run: |
+          echo "VITE_DISABLE_LICENSE=$VITE_DISABLE_LICENSE" >> .env.production
+          if [ "$VITE_DISABLE_LICENSE" = "1" ]; then
+            echo "UNLOCKED owner build - trial/activation gate disabled"
+          else
+            echo "Customer build - 14-day trial gate enabled"
+          fi
 
       - name: Set up Node.js
         uses: actions/setup-node@v5
@@ -132,6 +146,16 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v5
+
+      - name: Configure license mode
+        shell: bash
+        run: |
+          echo "VITE_DISABLE_LICENSE=$VITE_DISABLE_LICENSE" >> .env.production
+          if [ "$VITE_DISABLE_LICENSE" = "1" ]; then
+            echo "UNLOCKED owner build - trial/activation gate disabled"
+          else
+            echo "Customer build - 14-day trial gate enabled"
+          fi
 
       - name: Set up Node.js
         uses: actions/setup-node@v5
