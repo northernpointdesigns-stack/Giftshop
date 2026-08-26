@@ -36,7 +36,7 @@ export const CashDrawerModal: React.FC<CashDrawerModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
       <div className="relative w-full max-w-md bg-[#161B22] border border-[#1E293B] rounded-2xl p-6 shadow-2xl space-y-5">
         <div className="flex items-center justify-between border-b border-[#1E293B] pb-3">
           <h2 className="text-base font-bold text-white flex items-center gap-2">

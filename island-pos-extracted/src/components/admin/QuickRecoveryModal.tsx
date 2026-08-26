@@ -80,7 +80,7 @@ export const QuickRecoveryModal: React.FC<QuickRecoveryModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-fadeIn">
+    <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 overflow-y-auto animate-fadeIn">
       <div className="bg-[#161B22] border border-[#30363D] rounded-2xl max-w-xl w-full p-6 shadow-2xl text-slate-100 space-y-6 relative">
         {/* Close Button */}
         <button

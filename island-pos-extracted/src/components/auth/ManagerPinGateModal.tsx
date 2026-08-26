@@ -52,7 +52,7 @@ export const ManagerPinGateModal: React.FC<ManagerPinGateModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#0F1115]/85 backdrop-blur-md flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 bg-[#0F1115]/85 flex items-center justify-center p-4">
       <div className="bg-[#161B22] border border-amber-500/40 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl flex flex-col animate-scaleUp">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-[#1E293B] bg-[#0F1115]">

@@ -106,7 +106,7 @@ export const DrawerCashModal: React.FC<DrawerCashModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 overflow-y-auto">
       <div className="w-full max-w-lg bg-[#161B22] border border-[#1E293B] rounded-2xl shadow-2xl relative z-10 my-auto">
         {/* Header */}
         <div className="flex items-start justify-between gap-3 p-5 border-b border-[#1E293B]">

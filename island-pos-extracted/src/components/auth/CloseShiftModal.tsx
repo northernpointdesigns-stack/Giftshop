@@ -208,7 +208,7 @@ export const CloseShiftModal: React.FC<CloseShiftModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 overflow-y-auto">
       {/* Printable Area: This container is styled as thermal receipt upon window.print() */}
       <div className="hidden">
         <div className="thermal-receipt p-6 bg-white text-black font-mono text-sm leading-relaxed max-w-[80mm] mx-auto">
@@ -682,7 +682,7 @@ export const CloseShiftModal: React.FC<CloseShiftModalProps> = ({
 
       {/* Live Drawer Adjustment Modal — ported from Reports → EOD */}
       {isAdjustmentModalOpen && (
-        <div className="fixed inset-0 z-[60] bg-[#0F1115]/80 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[60] bg-[#0F1115]/80 flex items-center justify-center p-4">
           <div className="bg-[#161B22] border border-[#1E293B] rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between border-b border-[#1E293B] pb-3">
               <h3 className="text-sm font-bold text-[#E2E8F0] flex items-center gap-2">

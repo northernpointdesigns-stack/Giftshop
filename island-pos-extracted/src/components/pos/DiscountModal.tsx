@@ -31,7 +31,7 @@ export const DiscountModal: React.FC<DiscountModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#0F1115]/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 bg-[#0F1115]/80 flex items-center justify-center p-4">
       <div className="bg-[#161B22] border border-[#1E293B] rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl flex flex-col">
         <div className="flex items-center justify-between p-4 border-b border-[#1E293B] bg-[#0F1115]">
           <h2 className="text-lg font-bold text-amber-400 flex items-center gap-2">

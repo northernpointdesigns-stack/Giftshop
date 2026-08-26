@@ -156,7 +156,7 @@ export const AutoBackupModal: React.FC<AutoBackupModalProps> = ({
   const totalStoredBytes = snapshots.reduce((sum, s) => sum + (s.sizeBytes || 0), 0);
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#0F1115]/85 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+    <div className="fixed inset-0 z-50 bg-[#0F1115]/85 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
       <div className="bg-[#161B22] border border-[#1E293B] rounded-2xl max-w-4xl w-full text-[#E2E8F0] shadow-2xl flex flex-col max-h-[92vh] overflow-hidden">
         
         {/* Header */}

@@ -672,7 +672,7 @@ export default function App() {
 
       {/* Customer Dual Display Docked Preview Modal */}
       {isCustomerDisplayOpen && (
-        <div className="fixed inset-0 z-50 bg-[#0F1115]/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-[#0F1115]/80 flex items-center justify-center p-4">
           <div className="max-w-4xl w-full">
             <CustomerDisplay onCloseModal={() => setIsCustomerDisplayOpen(false)} />
           </div>

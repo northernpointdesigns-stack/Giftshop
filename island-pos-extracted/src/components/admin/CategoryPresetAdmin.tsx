@@ -209,7 +209,7 @@ export const CategoryPresetAdmin: React.FC<CategoryPresetAdminProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-xs flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-4">
       <div className="bg-[#161B22] border border-[#1E293B] rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
         {/* Header */}
         <div className="p-4 border-b border-[#1E293B] flex items-center justify-between bg-[#0F1115]">

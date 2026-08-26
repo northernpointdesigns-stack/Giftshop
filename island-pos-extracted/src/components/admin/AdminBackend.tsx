@@ -1370,7 +1370,7 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
 
       {/* Add / Edit Barcode Mapping Rule Modal */}
       {isRuleModalOpen && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
           <div className="bg-[#161B22] border border-[#1E293B] rounded-2xl w-full max-w-lg p-6 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between border-b border-[#1E293B] pb-3">
               <h3 className="text-sm font-bold text-[#E2E8F0] flex items-center gap-2">
@@ -1693,7 +1693,7 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
 
           {/* Delete Staff Confirm Modal */}
           {staffToDelete && (
-            <div className="fixed inset-0 z-50 bg-[#0F1115]/80 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="fixed inset-0 z-50 bg-[#0F1115]/80 flex items-center justify-center p-4">
               <div className="bg-[#161B22] border border-[#1E293B] rounded-2xl p-6 max-w-sm w-full text-[#E2E8F0] shadow-2xl space-y-4">
                 <div className="flex items-center justify-between pb-2 border-b border-[#1E293B]">
                   <h3 className="font-bold text-sm flex items-center gap-2 text-rose-400">
@@ -1727,7 +1727,7 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
 
           {/* Reset PIN Modal */}
           {editingStaffId && (
-            <div className="fixed inset-0 z-50 bg-[#0F1115]/80 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="fixed inset-0 z-50 bg-[#0F1115]/80 flex items-center justify-center p-4">
               <div className="bg-[#161B22] border border-[#1E293B] rounded-2xl p-6 max-w-sm w-full text-[#E2E8F0] shadow-2xl space-y-4">
                 <div className="flex items-center justify-between pb-2 border-b border-[#1E293B]">
                   <h3 className="font-bold text-sm flex items-center gap-2 text-emerald-400">
@@ -1771,7 +1771,7 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
 
           {/* Modal: Create New Cashier Account */}
           {isAddStaffModalOpen && (
-            <div className="fixed inset-0 z-50 bg-[#0F1115]/85 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="fixed inset-0 z-50 bg-[#0F1115]/85 flex items-center justify-center p-4">
               <div className="bg-[#161B22] border border-[#1E293B] rounded-2xl p-6 max-w-md w-full text-[#E2E8F0] shadow-2xl relative">
                 <div className="flex items-center justify-between pb-3 border-b border-[#1E293B] mb-4">
                   <div className="flex items-center gap-2 text-emerald-400">

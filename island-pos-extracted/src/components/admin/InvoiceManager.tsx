@@ -170,7 +170,7 @@ export const InvoiceManager: React.FC<InvoiceManagerProps> = ({ onRefreshData })
 
       {/* Invoice Editor Modal */}
       {editing && (
-        <div className="fixed inset-0 z-50 bg-[#0F1115]/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-[#0F1115]/80 flex items-center justify-center p-4">
           <div className="bg-[#161B22] border border-[#1E293B] rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl">
             <div className="flex items-center justify-between mb-4 pb-3 border-b border-[#1E293B]">
               <h3 className="text-base font-bold text-[#E2E8F0] flex items-center gap-2">
@@ -271,7 +271,7 @@ export const InvoiceManager: React.FC<InvoiceManagerProps> = ({ onRefreshData })
 
       {/* Payment Modal */}
       {payingInvoice && (
-        <div className="fixed inset-0 z-50 bg-[#0F1115]/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-[#0F1115]/80 flex items-center justify-center p-4">
           <div className="bg-[#161B22] border border-[#1E293B] rounded-2xl max-w-sm w-full p-6 shadow-2xl">
             <h3 className="text-base font-bold text-[#E2E8F0]">
               Record Payment — {payingInvoice.invoiceNumber}

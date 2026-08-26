@@ -202,7 +202,7 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#0F1115]/85 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+    <div className="fixed inset-0 z-50 bg-[#0F1115]/85 flex items-center justify-center p-4 overflow-y-auto">
       <div className="bg-[#161B22] border border-[#1E293B] rounded-2xl max-w-5xl w-full p-6 text-[#E2E8F0] shadow-2xl relative my-6 max-h-[92vh] flex flex-col justify-between">
         
         {/* Modal Header */}

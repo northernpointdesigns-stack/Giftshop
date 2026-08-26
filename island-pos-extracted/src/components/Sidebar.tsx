@@ -692,7 +692,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {/* Backdrop */}
           <div
             onClick={() => setIsOpenMobile(false)}
-            className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity duration-300"
+            className="fixed inset-0 bg-black/60 transition-opacity duration-300"
           />
           {/* Drawer Body */}
           <div className="relative w-[240px] max-w-xs h-full flex flex-col animate-in slide-in-from-left duration-300">

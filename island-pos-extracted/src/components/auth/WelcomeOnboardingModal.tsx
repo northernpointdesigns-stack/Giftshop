@@ -130,7 +130,7 @@ export const WelcomeOnboardingModal: React.FC<WelcomeOnboardingModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#0F1115]/90 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+    <div className="fixed inset-0 z-50 bg-[#0F1115]/90 flex items-center justify-center p-4 overflow-y-auto">
       <div className="w-full max-w-lg bg-[#161B22] border border-[#1E293B] rounded-2xl shadow-2xl overflow-hidden relative my-6">
         
         {/* Top Decorative Banner */}

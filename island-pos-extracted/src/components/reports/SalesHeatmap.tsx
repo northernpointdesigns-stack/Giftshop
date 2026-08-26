@@ -1497,7 +1497,7 @@ export const SalesHeatmap: React.FC<SalesHeatmapProps> = ({
 
       {/* DETAIL MODAL / DRAWER: Hourly Cell Inspection */}
       {selectedCell && (
-        <div className="fixed inset-0 z-50 bg-[#0F1115]/85 backdrop-blur-md flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-[#0F1115]/85 flex items-center justify-center p-4">
           <div className="bg-[#161B22] border border-emerald-500/40 rounded-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden shadow-2xl flex flex-col animate-scaleUp">
             {/* Modal Header */}
             <div className="flex items-center justify-between p-4 border-b border-[#1E293B] bg-[#0F1115]">
@@ -1617,7 +1617,7 @@ export const SalesHeatmap: React.FC<SalesHeatmapProps> = ({
 
       {/* DETAIL MODAL / DRAWER: Monthly Calendar Day Inspection */}
       {selectedCalendarDay && (
-        <div className="fixed inset-0 z-50 bg-[#0F1115]/85 backdrop-blur-md flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-[#0F1115]/85 flex items-center justify-center p-4">
           <div className="bg-[#161B22] border border-emerald-500/40 rounded-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden shadow-2xl flex flex-col animate-scaleUp">
             {/* Modal Header */}
             <div className="flex items-center justify-between p-4 border-b border-[#1E293B] bg-[#0F1115]">
