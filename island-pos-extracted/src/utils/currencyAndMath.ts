@@ -205,6 +205,8 @@ export interface OrderVerificationInput {
   vatInclusive: boolean;
   /** Fallback rate used only when the total carries no VAT at all. */
   defaultVatRate?: number;
+  /** Add the tourist VAT refund estimate into Total Savings (tax-free option ticked). */
+  includeTouristRefund?: boolean;
 }
 
 export interface OrderVerification {
@@ -234,7 +236,11 @@ export function computeOrderVerification(input: OrderVerificationInput): OrderVe
   const touristRefundEstimate =
     input.vat > 0 ? computeTouristRefund(input.vat).netRefundAmount : 0;
 
-  const totalSavings = totalDiscount;
+  // Total savings = real reductions, plus the tourist VAT refund estimate when
+  // the tax-free export option is chosen (money the customer gets back).
+  const totalSavings = roundMoney(
+    totalDiscount + (input.includeTouristRefund ? touristRefundEstimate : 0)
+  );
   const savingsPercent =
     input.shelfValue > 0
       ? Math.min(100, Math.round((totalSavings / input.shelfValue) * 100))

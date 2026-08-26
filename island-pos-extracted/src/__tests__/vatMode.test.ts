@@ -129,6 +129,33 @@ describe('computeOrderVerification — checkout summary math', () => {
     });
     expect(v.effectiveVatRate).toBeCloseTo(0.15, 2);
   });
+
+  it('includes the tourist refund estimate in Total Savings when the tax-free option is chosen', () => {
+    // Inclusive 250 shelf, VAT 32.61, no discounts, tourist refund 29.35
+    const v = computeOrderVerification({
+      shelfValue: 250,
+      markdowns: 0,
+      manualDiscount: 0,
+      vat: 32.61,
+      total: 250,
+      vatInclusive: true,
+      defaultVatRate: 0.15,
+      includeTouristRefund: true,
+    });
+    expect(v.totalSavings).toBeCloseTo(29.35, 2);
+    expect(v.savingsPercent).toBe(12); // 29.35 / 250
+    // Without the option, savings stay zero (default behaviour, regression guard)
+    const off = computeOrderVerification({
+      shelfValue: 250,
+      markdowns: 0,
+      manualDiscount: 0,
+      vat: 32.61,
+      total: 250,
+      vatInclusive: true,
+      defaultVatRate: 0.15,
+    });
+    expect(off.totalSavings).toBe(0);
+  });
 });
 
 describe('computeTouristRefund / resolveTransactionVat — tourist VAT math', () => {

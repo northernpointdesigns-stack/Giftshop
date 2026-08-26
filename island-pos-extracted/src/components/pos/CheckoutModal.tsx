@@ -168,6 +168,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     total,
     vatInclusive,
     defaultVatRate: settings.defaultVatRate,
+    includeTouristRefund: isTaxFreeNeeded,
   });
   const { totalDiscount: totalDiscountApplied, effectiveVatRate } = verification;
 
@@ -397,16 +398,16 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#0F1115]/80 flex items-center justify-center p-4">
-      <div className="bg-[#161B22] border border-[#1E293B] rounded-2xl max-w-xl w-full p-6 text-[#E2E8F0] shadow-2xl relative max-h-[92vh] overflow-y-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-[#1E293B]">
+    <div className="fixed inset-0 z-50 bg-[#0F1115]/80 flex items-center justify-center p-2 sm:p-4">
+      <div className="bg-[#161B22] border border-[#1E293B] rounded-2xl max-w-6xl w-full text-[#E2E8F0] shadow-2xl relative max-h-[94vh] flex flex-col overflow-hidden">
+        {/* Header (compact) */}
+        <div className="flex items-center justify-between px-5 py-3 border-b border-[#1E293B] shrink-0">
           <div>
-            <h2 className="text-xl font-bold text-[#E2E8F0] flex items-center gap-2">
+            <h2 className="text-lg font-bold text-[#E2E8F0] flex items-center gap-2">
               <DollarSign className="w-5 h-5 text-emerald-400" /> Complete Sale
             </h2>
             <p className="text-xs text-slate-400 mt-0.5">
-              Select payment method, mix currencies, or tender split payments
+              Details &amp; options on the left — tender payment on the right
             </p>
           </div>
           <button
@@ -417,6 +418,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           </button>
         </div>
 
+        <form onSubmit={handleSubmitPayment} className="flex-1 flex flex-col lg:flex-row min-h-0 overflow-hidden">
+          {/* LEFT COLUMN — order details, savings summary, receipt & tourist options */}
+          <div className="flex-1 min-w-0 lg:overflow-y-auto p-4 sm:p-5 space-y-4">
         {/* Order Summary Pill */}
         {(() => {
           const multiEqs = getMultiCurrencyEquivalents(total, settings);
@@ -492,45 +496,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           );
         })()}
 
-        {/* Checkout Currency Switcher (For Single Tender Mode) */}
-        {allowSecondaryPayment && paymentMethod !== 'split' && (
-          <div className="mb-4 flex items-center justify-between p-2.5 bg-slate-800/30 border border-slate-700/50 rounded-xl">
-            <span className="text-xs text-slate-300 font-semibold flex items-center gap-1">
-              <RefreshCw className="w-3.5 h-3.5 text-cyan-400 animate-spin-slow" /> Pay and Tender in:
-            </span>
-            <div className="flex gap-1">
-              <button
-                type="button"
-                onClick={() => {
-                  setCheckoutCurrency('primary');
-                  setCashGivenInput('');
-                }}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                  checkoutCurrency === 'primary'
-                    ? 'bg-emerald-600 text-white shadow-sm'
-                    : 'bg-slate-800 text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                {primaryCode} ({primarySymbol})
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setCheckoutCurrency('secondary');
-                  setCashGivenInput('');
-                }}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                  checkoutCurrency === 'secondary'
-                    ? 'bg-cyan-600 text-white shadow-sm'
-                    : 'bg-slate-800 text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                {secondaryCode} ({secondarySymbol})
-              </button>
-            </div>
-          </div>
-        )}
-
         {/* Customer Attachment Section */}
         <div className="mb-4 bg-[#0F1115] p-3 rounded-xl border border-[#1E293B]">
           <div className="flex items-center justify-between text-xs">
@@ -603,8 +568,330 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           )}
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmitPayment} className="space-y-4">
+          {/* Specialized Transaction Options: Gift Receipt & Tourist VAT Tax-Free Export */}
+          <div className="p-3 bg-[#161B22] border border-[#1E293B] rounded-xl space-y-3">
+            <div className="text-[11px] font-bold text-slate-300 uppercase tracking-wider flex items-center justify-between border-b border-[#1E293B] pb-1.5">
+              <span>Receipt &amp; Tourist Relief Options</span>
+              <span className="text-[9px] text-slate-500 font-normal">Optional</span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {/* Gift Receipt Toggle */}
+              <label
+                className={`p-2.5 rounded-lg border text-xs font-semibold flex items-center gap-2 cursor-pointer transition-all ${
+                  isGiftReceiptNeeded
+                    ? 'bg-amber-500/10 border-amber-500/40 text-amber-300'
+                    : 'bg-[#0F1115] border-[#1E293B] text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={isGiftReceiptNeeded}
+                  onChange={(e) => setIsGiftReceiptNeeded(e.target.checked)}
+                  className="rounded border-slate-700 text-amber-500 focus:ring-amber-500/20"
+                />
+                <Gift className="w-4 h-4 text-amber-400 shrink-0" />
+                <div className="leading-tight">
+                  <div>Gift Receipt Voucher</div>
+                  <div className="text-[9.5px] font-normal text-slate-500">Suppress prices on receipt</div>
+                </div>
+              </label>
+
+              {/* Tourist VAT Tax-Free Export Toggle */}
+              <label
+                className={`p-2.5 rounded-lg border text-xs font-semibold flex items-center gap-2 cursor-pointer transition-all ${
+                  isTaxFreeNeeded
+                    ? 'bg-blue-500/10 border-blue-500/40 text-blue-300'
+                    : 'bg-[#0F1115] border-[#1E293B] text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={isTaxFreeNeeded}
+                  onChange={(e) => setIsTaxFreeNeeded(e.target.checked)}
+                  className="rounded border-slate-700 text-blue-500 focus:ring-blue-500/20"
+                />
+                <Plane className="w-4 h-4 text-blue-400 shrink-0" />
+                <div className="leading-tight">
+                  <div>VAT Tax-Free Export</div>
+                  <div className="text-[9.5px] font-normal text-slate-500">International tourist refund</div>
+                </div>
+              </label>
+            </div>
+
+            {/* Expanded Tourist Details form when Tax-Free is enabled */}
+            {isTaxFreeNeeded && (
+              <div className="p-2.5 bg-blue-950/20 border border-blue-500/30 rounded-lg space-y-2 text-xs">
+                <div className="text-[10px] font-bold text-blue-300 uppercase tracking-wider flex items-center gap-1">
+                  <Plane className="w-3 h-3 text-blue-400" /> Traveler Export Customs Details
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[9.5px] text-slate-400 mb-0.5">Traveler Name</label>
+                    <input
+                      type="text"
+                      value={tfTravelerName}
+                      onChange={(e) => setTfTravelerName(e.target.value)}
+                      placeholder="Passport full name"
+                      className="w-full bg-[#0F1115] border border-slate-700 rounded px-2 py-1 text-xs text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[9.5px] text-slate-400 mb-0.5">Passport Number *</label>
+                    <input
+                      type="text"
+                      value={tfPassportNumber}
+                      onChange={(e) => setTfPassportNumber(e.target.value)}
+                      placeholder="e.g. 12AB34567"
+                      className="w-full bg-[#0F1115] border border-slate-700 rounded px-2 py-1 text-xs text-white font-mono font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[9.5px] text-slate-400 mb-0.5">Country of Residence</label>
+                    <input
+                      type="text"
+                      value={tfPassportCountry}
+                      onChange={(e) => setTfPassportCountry(e.target.value)}
+                      placeholder="e.g. Germany, UK, UAE"
+                      className="w-full bg-[#0F1115] border border-slate-700 rounded px-2 py-1 text-xs text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[9.5px] text-slate-400 mb-0.5">Flight / Cruise Departure</label>
+                    <input
+                      type="text"
+                      value={tfFlightNumber}
+                      onChange={(e) => setTfFlightNumber(e.target.value)}
+                      placeholder="e.g. EK706"
+                      className="w-full bg-[#0F1115] border border-slate-700 rounded px-2 py-1 text-xs text-white"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* DYNAMIC DISCOUNTS & TAX SAVINGS VERIFICATION SUMMARY BLOCK */}
+          <div className="p-3.5 bg-[#0F1115] border border-emerald-500/30 rounded-xl space-y-3 shadow-inner">
+            <div className="flex items-center justify-between border-b border-[#1E293B] pb-2">
+              <div className="flex items-center gap-2">
+                <Calculator className="w-4 h-4 text-emerald-400" />
+                <h3 className="text-xs font-bold text-[#E2E8F0] uppercase tracking-wider">
+                  Discounts &amp; Tax Savings Summary
+                </h3>
+              </div>
+              <span className="text-[10px] font-mono font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full">
+                Cashier Verification
+              </span>
+            </div>
+
+            {/* Metric Cards Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              {/* 1. Total Discount Applied (real reductions only) */}
+              <div className="bg-[#161B22] p-2.5 rounded-lg border border-[#1E293B] space-y-1">
+                <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium">
+                  <span className="flex items-center gap-1">
+                    <Tag className="w-3 h-3 text-amber-400" /> Total Discount:
+                  </span>
+                  {verification.hasDiscounts && (
+                    <span className="text-amber-400 font-bold font-mono">
+                      -{primarySymbol} {verification.totalDiscount.toFixed(2)}
+                    </span>
+                  )}
+                </div>
+                <div className={`text-base font-black font-mono ${verification.hasDiscounts ? 'text-amber-400' : 'text-slate-500'}`}>
+                  {primarySymbol} {verification.totalDiscount.toFixed(2)}
+                </div>
+                <div className="text-[9.5px] text-slate-500 space-y-0.5 font-mono">
+                  {itemMarkdowns > 0 && (
+                    <div className="truncate">• Damaged/Markdown: {primarySymbol} {itemMarkdowns.toFixed(2)}</div>
+                  )}
+                  {discount > 0 && (
+                    <div className="truncate">
+                      • Manual Disc ({discountType === 'percent' ? `${discountValue}%` : 'Fixed'}): {primarySymbol} {discount.toFixed(2)}
+                    </div>
+                  )}
+                  {!verification.hasDiscounts && (
+                    <div className="text-slate-600 italic">No discounts applied</div>
+                  )}
+                </div>
+              </div>
+              {/* 2. VAT — the actual tax in this sale (never a "saving") */}
+              <div className="bg-[#161B22] p-2.5 rounded-lg border border-[#1E293B] space-y-1">
+                <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium">
+                  <span className="flex items-center gap-1">
+                    <Percent className="w-3 h-3 text-cyan-400" /> VAT / Tax:
+                  </span>
+                  <span className="text-cyan-400 font-bold font-mono">
+                    {parseFloat((effectiveVatRate * 100).toFixed(1))}% Rate
+                  </span>
+                </div>
+                <div className="text-base font-black font-mono text-cyan-400">
+                  {primarySymbol} {tax.toFixed(2)}
+                </div>
+                <div className="text-[9.5px] text-slate-500 space-y-0.5 font-mono">
+                  <div className="truncate">
+                    {vatInclusive
+                      ? `• Included in shelf prices`
+                      : `• Added on top of prices`}
+                  </div>
+                  {isTaxFreeNeeded && tax > 0 && (
+                    <div className="truncate text-blue-300 font-semibold">
+                      ✈️ Tourist refund est.: {primarySymbol} {verification.touristRefundEstimate.toFixed(2)}
+                    </div>
+                  )}
+                </div>
+              </div>
+              {/* 3. Total Savings — discounts plus tourist refund when opted in */}
+              <div className="bg-[#161B22] p-2.5 rounded-lg border border-[#1E293B] space-y-1">
+                <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium">
+                  <span className="flex items-center gap-1">
+                    <PiggyBank className="w-3 h-3 text-emerald-400" /> Total Savings:
+                  </span>
+                  {verification.totalSavings > 0 && (
+                    <span className="text-emerald-400 font-bold font-mono bg-emerald-500/10 px-1.5 py-0.2 rounded border border-emerald-500/20">
+                      {verification.savingsPercent}% Saved
+                    </span>
+                  )}
+                </div>
+                <div className={`text-base font-black font-mono ${verification.totalSavings > 0 ? 'text-emerald-400' : 'text-slate-500'}`}>
+                  {primarySymbol} {verification.totalSavings.toFixed(2)}
+                </div>
+                <div className="text-[9.5px] text-slate-500 space-y-0.5 font-mono">
+                  {verification.hasDiscounts && (
+                    <div className="truncate">• Discounts: {primarySymbol} {verification.totalDiscount.toFixed(2)}</div>
+                  )}
+                  {isTaxFreeNeeded && verification.touristRefundEstimate > 0 && (
+                    <div className="truncate text-blue-300 font-semibold">
+                      • ✈️ Tourist refund: {primarySymbol} {verification.touristRefundEstimate.toFixed(2)}
+                    </div>
+                  )}
+                  {verification.totalSavings === 0 && (
+                    <div className="text-slate-600 italic">Tagged prices paid — no savings</div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Cashier Final Amount Verification Bar */}
+            <div className="p-2.5 bg-slate-900/80 border border-slate-700/60 rounded-lg flex flex-wrap items-center justify-between gap-2 text-xs">
+              <div className="flex items-center gap-2">
+                <Info className="w-4 h-4 text-emerald-400 shrink-0" />
+                <div>
+                  <div className="font-bold text-white flex items-center gap-1.5">
+                    <span>Tagged Price Value:</span>
+                    <span className={`font-mono ${verification.hasDiscounts ? 'text-slate-400 line-through' : 'text-white'}`}>
+                      {primarySymbol} {shelfValue.toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="text-[10px] text-slate-400">
+                    {isTaxFreeNeeded && verification.touristRefundEstimate > 0
+                      ? 'Tourist refund is claimed after departure — full amount due at the till'
+                      : verification.hasDiscounts
+                      ? 'Verify final amount with customer before tendering register'
+                      : 'No discounts — customer pays the tagged prices'}
+                  </div>
+                </div>
+              </div>
+
+              <div className="text-right">
+                <div className="text-[10px] text-slate-400 uppercase font-semibold">Final Payable Amount</div>
+                <div className="text-base font-black text-emerald-400 font-mono">
+                  {primarySymbol} {total.toFixed(2)} {primaryCode}
+                </div>
+              </div>
+            </div>
+          </div>
+          {/* Active Cashier Signed-In Account (Locked to Session for Cashiers, Selectable for Admins) */}
+          {isAdmin ? (
+            <div className="bg-[#0F1115] border border-amber-500/40 rounded-xl p-3 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  <span>Admin Cashier Selection Override</span>
+                </label>
+                <span className="text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/40 px-1.5 py-0.2 rounded font-mono font-bold">ADMIN PERMISSION</span>
+              </div>
+              <select
+                value={cashierName}
+                onChange={(e) => setCashierName(e.target.value)}
+                className="w-full bg-[#161B22] border border-[#1E293B] rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500 font-medium"
+              >
+                {posDb.getActiveCashiers().map((c) => (
+                  <option key={c.id} value={c.name}>
+                    {c.name} ({c.role.replace('_', ' ')})
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <div className="bg-[#0F1115] border border-emerald-500/30 rounded-xl p-3 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-lg shrink-0">
+                  <Lock className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider flex items-center gap-1.5">
+                    <span>Authenticated Cashier Account</span>
+                    <span className="text-[9px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-1.5 py-0.2 rounded font-mono font-bold">LOCKED</span>
+                  </div>
+                  <div className="text-xs font-bold text-white flex items-center gap-1.5 mt-0.5">
+                    <span>{cashierName}</span>
+                    <span className="text-[10px] font-mono px-1.5 py-0.2 bg-slate-800 text-slate-300 rounded border border-slate-700">
+                      {(currentStaff?.role || 'cashier').replace('_', ' ').toUpperCase()}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div className="text-[10px] text-slate-500 text-right font-mono hidden sm:block">
+                <div>Session: ACTIVE</div>
+                <div>ID: {currentStaff?.id || 'AUTH-SESSION'}</div>
+              </div>
+            </div>
+          )}
+          </div>
+
+          {/* RIGHT COLUMN — payment rail: total, tender, process */}
+          <div className="w-full lg:w-[360px] xl:w-[400px] shrink-0 border-t lg:border-t-0 lg:border-l border-[#1E293B] bg-[#0F1115] p-4 flex flex-col gap-3 lg:overflow-y-auto">
+            {/* Checkout Currency Switcher (For Single Tender Mode) */}
+            {allowSecondaryPayment && paymentMethod !== 'split' && (
+              <div className="flex items-center justify-between p-2.5 bg-slate-800/30 border border-slate-700/50 rounded-xl">
+                <span className="text-xs text-slate-300 font-semibold flex items-center gap-1">
+                  <RefreshCw className="w-3.5 h-3.5 text-cyan-400 animate-spin-slow" /> Pay and Tender in:
+                </span>
+                <div className="flex gap-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCheckoutCurrency('primary');
+                      setCashGivenInput('');
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                      checkoutCurrency === 'primary'
+                        ? 'bg-emerald-600 text-white shadow-sm'
+                        : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    {primaryCode} ({primarySymbol})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCheckoutCurrency('secondary');
+                      setCashGivenInput('');
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                      checkoutCurrency === 'secondary'
+                        ? 'bg-cyan-600 text-white shadow-sm'
+                        : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    {secondaryCode} ({secondarySymbol})
+                  </button>
+                </div>
+              </div>
+            )}
+
           {/* Payment Method Selector Grid */}
           <div>
             <label className="block text-xs font-semibold text-slate-300 mb-2">
@@ -998,281 +1285,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             </div>
           )}
 
-          {/* Specialized Transaction Options: Gift Receipt & Tourist VAT Tax-Free Export */}
-          <div className="p-3 bg-[#161B22] border border-[#1E293B] rounded-xl space-y-3">
-            <div className="text-[11px] font-bold text-slate-300 uppercase tracking-wider flex items-center justify-between border-b border-[#1E293B] pb-1.5">
-              <span>Receipt &amp; Tourist Relief Options</span>
-              <span className="text-[9px] text-slate-500 font-normal">Optional</span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {/* Gift Receipt Toggle */}
-              <label
-                className={`p-2.5 rounded-lg border text-xs font-semibold flex items-center gap-2 cursor-pointer transition-all ${
-                  isGiftReceiptNeeded
-                    ? 'bg-amber-500/10 border-amber-500/40 text-amber-300'
-                    : 'bg-[#0F1115] border-[#1E293B] text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  checked={isGiftReceiptNeeded}
-                  onChange={(e) => setIsGiftReceiptNeeded(e.target.checked)}
-                  className="rounded border-slate-700 text-amber-500 focus:ring-amber-500/20"
-                />
-                <Gift className="w-4 h-4 text-amber-400 shrink-0" />
-                <div className="leading-tight">
-                  <div>Gift Receipt Voucher</div>
-                  <div className="text-[9.5px] font-normal text-slate-500">Suppress prices on receipt</div>
-                </div>
-              </label>
-
-              {/* Tourist VAT Tax-Free Export Toggle */}
-              <label
-                className={`p-2.5 rounded-lg border text-xs font-semibold flex items-center gap-2 cursor-pointer transition-all ${
-                  isTaxFreeNeeded
-                    ? 'bg-blue-500/10 border-blue-500/40 text-blue-300'
-                    : 'bg-[#0F1115] border-[#1E293B] text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  checked={isTaxFreeNeeded}
-                  onChange={(e) => setIsTaxFreeNeeded(e.target.checked)}
-                  className="rounded border-slate-700 text-blue-500 focus:ring-blue-500/20"
-                />
-                <Plane className="w-4 h-4 text-blue-400 shrink-0" />
-                <div className="leading-tight">
-                  <div>VAT Tax-Free Export</div>
-                  <div className="text-[9.5px] font-normal text-slate-500">International tourist refund</div>
-                </div>
-              </label>
-            </div>
-
-            {/* Expanded Tourist Details form when Tax-Free is enabled */}
-            {isTaxFreeNeeded && (
-              <div className="p-2.5 bg-blue-950/20 border border-blue-500/30 rounded-lg space-y-2 text-xs">
-                <div className="text-[10px] font-bold text-blue-300 uppercase tracking-wider flex items-center gap-1">
-                  <Plane className="w-3 h-3 text-blue-400" /> Traveler Export Customs Details
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-[9.5px] text-slate-400 mb-0.5">Traveler Name</label>
-                    <input
-                      type="text"
-                      value={tfTravelerName}
-                      onChange={(e) => setTfTravelerName(e.target.value)}
-                      placeholder="Passport full name"
-                      className="w-full bg-[#0F1115] border border-slate-700 rounded px-2 py-1 text-xs text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[9.5px] text-slate-400 mb-0.5">Passport Number *</label>
-                    <input
-                      type="text"
-                      value={tfPassportNumber}
-                      onChange={(e) => setTfPassportNumber(e.target.value)}
-                      placeholder="e.g. 12AB34567"
-                      className="w-full bg-[#0F1115] border border-slate-700 rounded px-2 py-1 text-xs text-white font-mono font-bold"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[9.5px] text-slate-400 mb-0.5">Country of Residence</label>
-                    <input
-                      type="text"
-                      value={tfPassportCountry}
-                      onChange={(e) => setTfPassportCountry(e.target.value)}
-                      placeholder="e.g. Germany, UK, UAE"
-                      className="w-full bg-[#0F1115] border border-slate-700 rounded px-2 py-1 text-xs text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[9.5px] text-slate-400 mb-0.5">Flight / Cruise Departure</label>
-                    <input
-                      type="text"
-                      value={tfFlightNumber}
-                      onChange={(e) => setTfFlightNumber(e.target.value)}
-                      placeholder="e.g. EK706"
-                      className="w-full bg-[#0F1115] border border-slate-700 rounded px-2 py-1 text-xs text-white"
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* DYNAMIC DISCOUNTS & TAX SAVINGS VERIFICATION SUMMARY BLOCK */}
-          <div className="p-3.5 bg-[#0F1115] border border-emerald-500/30 rounded-xl space-y-3 shadow-inner">
-            <div className="flex items-center justify-between border-b border-[#1E293B] pb-2">
-              <div className="flex items-center gap-2">
-                <Calculator className="w-4 h-4 text-emerald-400" />
-                <h3 className="text-xs font-bold text-[#E2E8F0] uppercase tracking-wider">
-                  Discounts &amp; Tax Savings Summary
-                </h3>
-              </div>
-              <span className="text-[10px] font-mono font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full">
-                Cashier Verification
-              </span>
-            </div>
-
-            {/* Metric Cards Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              {/* 1. Total Discount Applied (real reductions only) */}
-              <div className="bg-[#161B22] p-2.5 rounded-lg border border-[#1E293B] space-y-1">
-                <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium">
-                  <span className="flex items-center gap-1">
-                    <Tag className="w-3 h-3 text-amber-400" /> Total Discount:
-                  </span>
-                  {verification.hasDiscounts && (
-                    <span className="text-amber-400 font-bold font-mono">
-                      -{primarySymbol} {verification.totalDiscount.toFixed(2)}
-                    </span>
-                  )}
-                </div>
-                <div className={`text-base font-black font-mono ${verification.hasDiscounts ? 'text-amber-400' : 'text-slate-500'}`}>
-                  {primarySymbol} {verification.totalDiscount.toFixed(2)}
-                </div>
-                <div className="text-[9.5px] text-slate-500 space-y-0.5 font-mono">
-                  {itemMarkdowns > 0 && (
-                    <div className="truncate">• Damaged/Markdown: {primarySymbol} {itemMarkdowns.toFixed(2)}</div>
-                  )}
-                  {discount > 0 && (
-                    <div className="truncate">
-                      • Manual Disc ({discountType === 'percent' ? `${discountValue}%` : 'Fixed'}): {primarySymbol} {discount.toFixed(2)}
-                    </div>
-                  )}
-                  {!verification.hasDiscounts && (
-                    <div className="text-slate-600 italic">No discounts applied</div>
-                  )}
-                </div>
-              </div>
-
-              {/* 2. VAT — the actual tax in this sale (never a "saving") */}
-              <div className="bg-[#161B22] p-2.5 rounded-lg border border-[#1E293B] space-y-1">
-                <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium">
-                  <span className="flex items-center gap-1">
-                    <Percent className="w-3 h-3 text-cyan-400" /> VAT / Tax:
-                  </span>
-                  <span className="text-cyan-400 font-bold font-mono">
-                    {parseFloat((effectiveVatRate * 100).toFixed(1))}% Rate
-                  </span>
-                </div>
-                <div className="text-base font-black font-mono text-cyan-400">
-                  {primarySymbol} {tax.toFixed(2)}
-                </div>
-                <div className="text-[9.5px] text-slate-500 space-y-0.5 font-mono">
-                  <div className="truncate">
-                    {vatInclusive
-                      ? `• Included in shelf prices`
-                      : `• Added on top of prices`}
-                  </div>
-                  {isTaxFreeNeeded && tax > 0 && (
-                    <div className="truncate text-blue-300 font-semibold">
-                      ✈️ Tourist refund est.: {primarySymbol} {verification.touristRefundEstimate.toFixed(2)}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* 3. Total Savings — real money off the tagged prices */}
-              <div className="bg-[#161B22] p-2.5 rounded-lg border border-[#1E293B] space-y-1">
-                <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium">
-                  <span className="flex items-center gap-1">
-                    <PiggyBank className="w-3 h-3 text-emerald-400" /> Total Savings:
-                  </span>
-                  {verification.hasDiscounts && (
-                    <span className="text-emerald-400 font-bold font-mono bg-emerald-500/10 px-1.5 py-0.2 rounded border border-emerald-500/20">
-                      {verification.savingsPercent}% Saved
-                    </span>
-                  )}
-                </div>
-                <div className={`text-base font-black font-mono ${verification.hasDiscounts ? 'text-emerald-400' : 'text-slate-500'}`}>
-                  {primarySymbol} {verification.totalSavings.toFixed(2)}
-                </div>
-                <div className="text-[9.5px] text-slate-500 font-mono">
-                  {verification.hasDiscounts
-                    ? 'Total reductions off tagged prices'
-                    : 'Tagged prices paid — no reductions'}
-                </div>
-              </div>
-            </div>
-
-            {/* Cashier Final Amount Verification Bar */}
-            <div className="p-2.5 bg-slate-900/80 border border-slate-700/60 rounded-lg flex flex-wrap items-center justify-between gap-2 text-xs">
-              <div className="flex items-center gap-2">
-                <Info className="w-4 h-4 text-emerald-400 shrink-0" />
-                <div>
-                  <div className="font-bold text-white flex items-center gap-1.5">
-                    <span>Tagged Price Value:</span>
-                    <span className={`font-mono ${verification.hasDiscounts ? 'text-slate-400 line-through' : 'text-white'}`}>
-                      {primarySymbol} {shelfValue.toFixed(2)}
-                    </span>
-                  </div>
-                  <div className="text-[10px] text-slate-400">
-                    {verification.hasDiscounts
-                      ? 'Verify final amount with customer before tendering register'
-                      : 'No discounts — customer pays the tagged prices'}
-                  </div>
-                </div>
-              </div>
-
-              <div className="text-right">
-                <div className="text-[10px] text-slate-400 uppercase font-semibold">Final Payable Amount</div>
-                <div className="text-base font-black text-emerald-400 font-mono">
-                  {primarySymbol} {total.toFixed(2)} {primaryCode}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Active Cashier Signed-In Account (Locked to Session for Cashiers, Selectable for Admins) */}
-          {isAdmin ? (
-            <div className="bg-[#0F1115] border border-amber-500/40 rounded-xl p-3 space-y-1.5">
-              <div className="flex items-center justify-between">
-                <label className="text-[10px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <ShieldCheck className="w-3.5 h-3.5" />
-                  <span>Admin Cashier Selection Override</span>
-                </label>
-                <span className="text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/40 px-1.5 py-0.2 rounded font-mono font-bold">ADMIN PERMISSION</span>
-              </div>
-              <select
-                value={cashierName}
-                onChange={(e) => setCashierName(e.target.value)}
-                className="w-full bg-[#161B22] border border-[#1E293B] rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500 font-medium"
-              >
-                {posDb.getActiveCashiers().map((c) => (
-                  <option key={c.id} value={c.name}>
-                    {c.name} ({c.role.replace('_', ' ')})
-                  </option>
-                ))}
-              </select>
-            </div>
-          ) : (
-            <div className="bg-[#0F1115] border border-emerald-500/30 rounded-xl p-3 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-lg shrink-0">
-                  <Lock className="w-4 h-4" />
-                </div>
-                <div>
-                  <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider flex items-center gap-1.5">
-                    <span>Authenticated Cashier Account</span>
-                    <span className="text-[9px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-1.5 py-0.2 rounded font-mono font-bold">LOCKED</span>
-                  </div>
-                  <div className="text-xs font-bold text-white flex items-center gap-1.5 mt-0.5">
-                    <span>{cashierName}</span>
-                    <span className="text-[10px] font-mono px-1.5 py-0.2 bg-slate-800 text-slate-300 rounded border border-slate-700">
-                      {(currentStaff?.role || 'cashier').replace('_', ' ').toUpperCase()}
-                    </span>
-                  </div>
-                </div>
-              </div>
-              <div className="text-[10px] text-slate-500 text-right font-mono hidden sm:block">
-                <div>Session: ACTIVE</div>
-                <div>ID: {currentStaff?.id || 'AUTH-SESSION'}</div>
-              </div>
-            </div>
-          )}
-
           {/* Submit Button */}
           <div className="pt-2">
             <button
@@ -1300,6 +1312,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 </>
               )}
             </button>
+          </div>
           </div>
         </form>
       </div>
