@@ -1,6 +1,0 @@
-{
-  "name": "IslandPOS Pro - Retail & Consignment POS",
-  "description": "Desktop-style POS and inventory management system with vendor payout tracking, barcode scanning, dual customer display simulator, and end-of-day financial analytics.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}
