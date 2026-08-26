@@ -11,6 +11,12 @@ on:
 permissions:
   contents: write
 
+# Owner builds: pushes/PRs against the 'owner' branch set this flag, which
+# strips the 14-day trial timer and activation gate from the built apps.
+# Builds from any other branch/tag keep the normal customer trial flow.
+env:
+  VITE_DISABLE_LICENSE: ${{ github.ref_name == 'owner' && '1' || '0' }}
+
 jobs:
   desktop:
     name: Desktop (${{ matrix.os }})

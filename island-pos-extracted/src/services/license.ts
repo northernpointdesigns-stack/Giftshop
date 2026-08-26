@@ -11,6 +11,25 @@
 
 export const LICENSE_SECRET = 'bps-v1-9c4f7a2e81d5b603';
 export const TRIAL_DAYS = 14;
+
+/**
+ * Build-time kill switch for the trial/license gate.
+ *
+ * Set VITE_DISABLE_LICENSE=1 in a local .env.local (git-ignored) to build
+ * copies with NO trial timer and NO activation screen — the app runs fully
+ * unlocked. Release builds from GitHub do not set this flag, so customer
+ * builds keep the normal 14-day trial + license key flow.
+ */
+function readLicenseDisabledFlag(): boolean {
+  try {
+    const env = (import.meta as { env?: Record<string, string | undefined> } | undefined)?.env;
+    const flag = env?.VITE_DISABLE_LICENSE;
+    return flag === '1' || flag === 'true';
+  } catch {
+    return false;
+  }
+}
+export const LICENSE_DISABLED = readLicenseDisabledFlag();
 /** Where customers buy — point this at your Gumroad / Lemon Squeezy / Paddle page */
 export const PURCHASE_URL = 'https://your-store.example.com/buy';
 export const SUPPORT_EMAIL = 'support@your-store.example.com';
@@ -128,9 +147,9 @@ function getTrialStartDate(): Date {
   return now;
 }
 
-/** Days remaining in trial, or null when already licensed */
+/** Days remaining in trial, or null when already licensed (or gate disabled) */
 export function trialDaysLeft(): number | null {
-  if (getStoredLicense()) return null;
+  if (LICENSE_DISABLED || getStoredLicense()) return null;
   const start = getTrialStartDate();
   const msLeft = TRIAL_DAYS * 86400000 - (Date.now() - start.getTime());
   if (msLeft > 0) return Math.max(1, Math.ceil(msLeft / 86400000));
@@ -145,6 +164,13 @@ export type LicenseState =
 
 /** One-call status resolution used by the app shell on startup */
 export function resolveLicenseState(): LicenseState {
+  // Gate disabled at build time: run fully unlocked, no badge, no lock screen
+  if (LICENSE_DISABLED) {
+    return {
+      status: 'licensed',
+      license: { key: 'UNLOCKED-BUILD', email: 'owner@local', activatedAt: new Date().toISOString() },
+    };
+  }
   const license = getStoredLicense();
   if (license) return { status: 'licensed', license };
   const left = trialDaysLeft();
