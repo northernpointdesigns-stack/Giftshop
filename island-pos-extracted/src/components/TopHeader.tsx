@@ -81,6 +81,18 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
         {/* Offline Pill */}
         <OfflineStatusPill onRefreshData={onRefreshData} />
 
+        {/* Always visible beside connection status; this replaces the tiny
+            sidebar-only control so mouse users can reliably find it. */}
+        <button
+          onClick={onOpenCustomerDisplay}
+          className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-2.5 sm:px-3 py-1.5 rounded-xl text-[10px] sm:text-xs font-bold transition-all active:scale-95 whitespace-nowrap"
+          title="Open the customer-facing secondary display"
+        >
+          <Monitor className="w-3.5 h-3.5 text-emerald-400" />
+          <span className="hidden sm:inline">Dual Display</span>
+          <span className="sm:hidden">Display</span>
+        </button>
+
         {/* Low Stock Alerts */}
         {lowStockCount > 0 && (
           <button
@@ -94,19 +106,6 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
           </button>
         )}
 
-        {/* Compact quick header menu for mobile view details.
-            Close Shop / Log Out live ONLY in the Sidebar's labeled pill buttons
-            (reachable here via the hamburger above) — no duplicate icon-only
-            triggers in the header, so there's exactly one obvious place for them. */}
-        <div className="lg:hidden flex items-center gap-1.5">
-          <button
-            onClick={onOpenCustomerDisplay}
-            className="p-1.5 rounded-xl bg-slate-900 border border-[#1E293B] text-slate-400 hover:text-emerald-400 transition-colors"
-            title="Secondary Display Screen"
-          >
-            <Monitor className="w-4 h-4" />
-          </button>
-        </div>
       </div>
     </header>
   );

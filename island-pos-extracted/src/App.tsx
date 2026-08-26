@@ -431,7 +431,6 @@ export default function App() {
         cashierAccess={cashierAccess}
         lowStockCount={lowStockItems.length}
         onOpenLowStockModal={() => setIsLowStockModalOpen(true)}
-        onOpenCustomerDisplay={() => setIsCustomerDisplayOpen(true)}
         onOpenSqlInspector={() => setIsSqlInspectorOpen(true)}
         onOpenQuickRecovery={() => setIsQuickRecoveryOpen(true)}
         onOpenDrawerCash={() => setIsDrawerCashModalOpen(true)}

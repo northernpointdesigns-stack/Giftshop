@@ -37,6 +37,19 @@ body,
   background: #334155;
 }
 
+/* Admin navigation must remain usable with a mouse at every viewport width.
+   Sub-pills wrap instead of becoming hidden in a trackpad-only scroll strip. */
+.admin-subnav > button {
+  min-width: 0;
+  max-width: 100%;
+  text-align: left;
+}
+
+.admin-subnav > button > span {
+  min-width: 0;
+  white-space: normal;
+}
+
 /* Thermal Receipt Printing Logic */
 @media print {
   /* Only hide other elements if a thermal receipt is on screen */
@@ -95,4 +108,3 @@ body,
     size: 80mm auto;
   }
 }
-

@@ -130,6 +130,41 @@ describe('computeOrderVerification — checkout summary math', () => {
     expect(v.effectiveVatRate).toBeCloseTo(0.15, 2);
   });
 
+  it('applies the configured tourist fee percent (0% = full VAT refunded)', () => {
+    const v = computeOrderVerification({
+      shelfValue: 250,
+      markdowns: 0,
+      manualDiscount: 0,
+      vat: 32.61,
+      total: 250,
+      vatInclusive: true,
+      defaultVatRate: 0.15,
+      includeTouristRefund: true,
+      touristFeePercent: 0,
+    });
+    expect(v.touristRefundEstimate).toBeCloseTo(32.61, 2);
+    expect(v.totalSavings).toBeCloseTo(32.61, 2);
+    expect(v.touristFeeAmount).toBe(0);
+  });
+
+  it('exposes the gross VAT and retained fee for the savings breakdown', () => {
+    const v = computeOrderVerification({
+      shelfValue: 250,
+      markdowns: 0,
+      manualDiscount: 0,
+      vat: 32.61,
+      total: 250,
+      vatInclusive: true,
+      defaultVatRate: 0.15,
+      includeTouristRefund: true,
+      touristFeePercent: 10,
+    });
+    expect(v.touristGrossVat).toBeCloseTo(32.61, 2);
+    expect(v.touristFeeAmount).toBeCloseTo(3.26, 2);
+    expect(v.touristRefundEstimate).toBeCloseTo(29.35, 2);
+    expect(v.touristGrossVat - v.touristFeeAmount).toBeCloseTo(v.touristRefundEstimate, 2);
+  });
+
   it('includes the tourist refund estimate in Total Savings when the tax-free option is chosen', () => {
     // Inclusive 250 shelf, VAT 32.61, no discounts, tourist refund 29.35
     const v = computeOrderVerification({

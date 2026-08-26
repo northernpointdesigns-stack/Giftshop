@@ -905,11 +905,11 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
       {/* Main Admin Master Category Pills & Sub-Category Selector */}
       <div className="space-y-3">
         {/* Top Master Category Pills */}
-        <div className="flex bg-[#161B22] p-1.5 rounded-2xl border border-[#1E293B] text-xs gap-1.5 overflow-x-auto scrollbar-none shadow-md">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6 bg-[#161B22] p-1.5 rounded-2xl border border-[#1E293B] text-xs gap-1.5 shadow-md">
           {/* Master Pill 1: Register */}
           <button
             onClick={() => setAdminTab('register')}
-            className={`flex-1 py-2.5 px-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all whitespace-nowrap cursor-pointer ${
+            className={`min-w-0 py-2.5 px-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all text-center cursor-pointer ${
               adminTab === 'register'
                 ? 'bg-emerald-600 text-white shadow-md'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
@@ -922,7 +922,7 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
           {/* Master Pill 2: Cashiers & Security */}
           <button
             onClick={() => setAdminTab('cashiers')}
-            className={`flex-1 py-2.5 px-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all whitespace-nowrap cursor-pointer ${
+            className={`min-w-0 py-2.5 px-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all text-center cursor-pointer ${
               adminTab === 'cashiers' || adminTab === 'permissions'
                 ? 'bg-emerald-600 text-white shadow-md'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
@@ -935,7 +935,7 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
           {/* Master Pill 2: Product Management */}
           <button
             onClick={() => setAdminTab('pricing')}
-            className={`flex-1 py-2.5 px-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all whitespace-nowrap cursor-pointer ${
+            className={`min-w-0 py-2.5 px-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all text-center cursor-pointer ${
               adminTab === 'pricing' || adminTab === 'tabs' || adminTab === 'pills'
                 ? 'bg-emerald-600 text-white shadow-md'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
@@ -948,7 +948,7 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
           {/* Master Pill 3: Email, WhatsApp & Peripherals */}
           <button
             onClick={() => setAdminTab('hardware')}
-            className={`flex-1 py-2.5 px-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all whitespace-nowrap cursor-pointer ${
+            className={`min-w-0 py-2.5 px-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all text-center cursor-pointer ${
               adminTab === 'hardware' || adminTab === 'comms' || adminTab === 'barcodes'
                 ? 'bg-emerald-600 text-white shadow-md'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
@@ -961,7 +961,7 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
           {/* Master Pill 4: Receipts & White Label */}
           <button
             onClick={() => setAdminTab('receipts')}
-            className={`flex-1 py-2.5 px-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all whitespace-nowrap cursor-pointer ${
+            className={`min-w-0 py-2.5 px-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all text-center cursor-pointer ${
               adminTab === 'receipts' || adminTab === 'whitelabel'
                 ? 'bg-emerald-600 text-white shadow-md'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
@@ -974,7 +974,7 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
           {/* Master Pill 5: Store System & Audits */}
           <button
             onClick={() => setAdminTab('settings')}
-            className={`flex-1 py-2.5 px-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all whitespace-nowrap cursor-pointer ${
+            className={`min-w-0 py-2.5 px-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all text-center cursor-pointer ${
               adminTab === 'settings' || adminTab === 'feedback'
                 ? 'bg-emerald-600 text-white shadow-md'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
@@ -986,8 +986,8 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
         </div>
 
         {/* Dynamic Sub-Pill Navigation Selector */}
-        <div className="flex items-center gap-2 bg-[#0F1115] border border-[#1E293B] p-2 rounded-xl text-xs overflow-x-auto scrollbar-none">
-          <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider px-2 shrink-0 flex items-center gap-1">
+        <div className="admin-subnav flex flex-wrap items-center gap-2 bg-[#0F1115] border border-[#1E293B] p-2 rounded-xl text-xs">
+          <span className="w-full sm:w-auto text-[10px] text-slate-500 font-bold uppercase tracking-wider px-2 flex items-center gap-1">
             <Sliders className="w-3 h-3 text-emerald-400" /> Store Settings Sub-Category:
           </span>
 
@@ -4777,6 +4777,28 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
                     Print receipt automatically when payment is entered at checkout
                   </span>
                 </label>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-300 font-medium">
+                    Tourist tax-free refund processing fee (%):
+                  </span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.5"
+                    value={settings.taxFreeAdminFeePercent ?? 10}
+                    onChange={(e) => {
+                      const v = Math.min(100, Math.max(0, parseFloat(e.target.value) || 0));
+                      posDb.updateSettings({ taxFreeAdminFeePercent: v });
+                      setSettings({ ...settings, taxFreeAdminFeePercent: v });
+                    }}
+                    className="w-16 bg-[#161B22] border border-[#1E293B] rounded px-2 py-1 text-xs text-white font-mono focus:outline-none focus:border-emerald-500"
+                  />
+                  <span className="text-[10px] text-slate-500">
+                    Deducted from the VAT refund (checkout estimate + certificate)
+                  </span>
+                </div>
               </div>
             </div>
             )}

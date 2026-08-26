@@ -21,6 +21,10 @@ export const printStandardInvoice = (
   const secondaryCode = settings.secondaryCurrency || 'USD';
   const exchangeRate = settings.exchangeRate || 1;
   const logoUrl = settings.shopLogoUrl || settings.receiptLogoUrl || settings.brandLogoUrl;
+  // A missing monetary field in a legacy transaction must not prevent its
+  // invoice from being printed or sent from the completed-sale screen.
+  const money = (amount: number | undefined | null) =>
+    (Number.isFinite(amount) ? amount! : 0).toFixed(2);
 
   // Effective VAT rate for this transaction, blended from the actual amounts —
   // never assume a fixed statutory percentage.
@@ -100,13 +104,13 @@ export const printStandardInvoice = (
             }
           </td>
           <td class="text-center font-bold">${Math.abs(item.quantity)}</td>
-          <td class="text-right font-mono">${primarySymbol} ${item.unitPrice.toFixed(2)}</td>
+          <td class="text-right font-mono">${primarySymbol} ${money(item.unitPrice)}</td>
           <td class="text-right font-mono ${discount > 0 ? 'text-danger' : 'text-muted'}">
             ${discount > 0 ? `-${primarySymbol} ${discount.toFixed(2)}` : '—'}
           </td>
           <td class="text-center text-xs font-mono">${vatRatePercent}%</td>
           <td class="text-right font-mono text-muted">${primarySymbol} ${vatAmt.toFixed(2)}</td>
-          <td class="text-right font-mono font-bold text-dark">${primarySymbol} ${item.totalPrice.toFixed(2)}</td>
+          <td class="text-right font-mono font-bold text-dark">${primarySymbol} ${money(item.totalPrice)}</td>
         </tr>
       `;
     })
@@ -615,8 +619,8 @@ export const printStandardInvoice = (
                 <span class="value font-mono">
                   ${
                     transaction.currencyUsed === 'secondary' && transaction.cashGivenSecondary !== undefined
-                      ? `${secondarySymbol} ${transaction.cashGivenSecondary.toFixed(2)} ${secondaryCode}`
-                      : `${primarySymbol} ${transaction.cashGiven.toFixed(2)} ${primaryCode}`
+                      ? `${secondarySymbol} ${money(transaction.cashGivenSecondary)} ${secondaryCode}`
+                      : `${primarySymbol} ${money(transaction.cashGiven)} ${primaryCode}`
                   }
                 </span>
               </div>
@@ -631,8 +635,8 @@ export const printStandardInvoice = (
                 <span class="value font-mono font-bold text-success">
                   ${
                     transaction.currencyUsed === 'secondary' && transaction.changeDueSecondary !== undefined
-                      ? `${secondarySymbol} ${transaction.changeDueSecondary.toFixed(2)} ${secondaryCode} (${primarySymbol} ${(transaction.changeDueSecondary * (transaction.exchangeRateUsed || exchangeRate)).toFixed(2)} ${primaryCode})`
-                      : `${primarySymbol} ${transaction.changeDue.toFixed(2)} ${primaryCode}`
+                      ? `${secondarySymbol} ${money(transaction.changeDueSecondary)} ${secondaryCode} (${primarySymbol} ${money(transaction.changeDueSecondary * (transaction.exchangeRateUsed || exchangeRate))} ${primaryCode})`
+                      : `${primarySymbol} ${money(transaction.changeDue)} ${primaryCode}`
                   }
                 </span>
               </div>
@@ -659,8 +663,8 @@ export const printStandardInvoice = (
                         (p) => `
                       <tr style="border-bottom: 1px solid #f1f5f9;">
                         <td style="padding: 2px 4px; text-transform: capitalize;">${p.method === 'cash' ? '💵 Cash' : p.method === 'card' ? '💳 Credit Card' : '🎁 Gift Card'} (${p.currencyCode})</td>
-                        <td style="padding: 2px 4px; text-align: right; font-family: monospace;">${p.currencySymbol}${p.amountTendered.toFixed(2)}</td>
-                        <td style="padding: 2px 4px; text-align: right; font-family: monospace; font-weight: bold;">${primarySymbol}${p.amountInPrimary.toFixed(2)}</td>
+                        <td style="padding: 2px 4px; text-align: right; font-family: monospace;">${p.currencySymbol}${money(p.amountTendered)}</td>
+                        <td style="padding: 2px 4px; text-align: right; font-family: monospace; font-weight: bold;">${primarySymbol}${money(p.amountInPrimary)}</td>
                       </tr>
                     `
                       )
@@ -677,9 +681,9 @@ export const printStandardInvoice = (
                 ? `
               <div class="foreign-settlement-card">
                 <div class="font-bold text-primary mb-1">Dual-Currency Conversion Details:</div>
-                <div>Foreign Amount Paid: <strong>${secondarySymbol} ${transaction.secondaryTotal.toFixed(2)} ${secondaryCode}</strong></div>
-                <div>Locked Exchange Rate: <strong>1 ${secondaryCode} = ${primarySymbol} ${(transaction.exchangeRateUsed || exchangeRate).toFixed(2)}</strong></div>
-                <div class="text-muted mt-1">Official accounting ledger credited with ${primarySymbol} ${transaction.total.toFixed(2)} ${primaryCode}.</div>
+                <div>Foreign Amount Paid: <strong>${secondarySymbol} ${money(transaction.secondaryTotal)} ${secondaryCode}</strong></div>
+                <div>Locked Exchange Rate: <strong>1 ${secondaryCode} = ${primarySymbol} ${money(transaction.exchangeRateUsed || exchangeRate)}</strong></div>
+                <div class="text-muted mt-1">Official accounting ledger credited with ${primarySymbol} ${money(transaction.total)} ${primaryCode}.</div>
               </div>
             `
                 : ''
@@ -715,14 +719,14 @@ export const printStandardInvoice = (
               <table class="totals-table">
                 <tr>
                   <td class="text-muted">${settings.vatInclusive ? 'Subtotal (VAT Incl.):' : 'Gross Subtotal (Excl. VAT):'}</td>
-                  <td class="text-right font-mono font-semibold">${primarySymbol} ${transaction.subtotal.toFixed(2)}</td>
+                  <td class="text-right font-mono font-semibold">${primarySymbol} ${money(transaction.subtotal)}</td>
                 </tr>
                 ${
                   transaction.itemDiscountTotal && transaction.itemDiscountTotal > 0
                     ? `
                   <tr>
                     <td class="text-danger">Damaged Item Markdowns:</td>
-                    <td class="text-right font-mono text-danger font-semibold">-${primarySymbol} ${transaction.itemDiscountTotal.toFixed(2)}</td>
+                    <td class="text-right font-mono text-danger font-semibold">-${primarySymbol} ${money(transaction.itemDiscountTotal)}</td>
                   </tr>
                 `
                     : ''
@@ -732,18 +736,18 @@ export const printStandardInvoice = (
                     ? `
                   <tr>
                     <td class="text-danger">Order Level Discount:</td>
-                    <td class="text-right font-mono text-danger font-semibold">-${primarySymbol} ${transaction.discount.toFixed(2)}</td>
+                    <td class="text-right font-mono text-danger font-semibold">-${primarySymbol} ${money(transaction.discount)}</td>
                   </tr>
                 `
                     : ''
                 }
                 <tr>
                   <td class="text-muted">VAT (${vatPctStr}${settings.vatInclusive ? ', Included' : ' Tax'}):</td>
-                  <td class="text-right font-mono font-semibold">${primarySymbol} ${(transaction.vatTotal || transaction.tax || 0).toFixed(2)}</td>
+                  <td class="text-right font-mono font-semibold">${primarySymbol} ${money(transaction.vatTotal || transaction.tax)}</td>
                 </tr>
                 <tr class="grand-total-row">
                   <td>${transaction.isRefund ? 'TOTAL REFUNDED:' : 'TOTAL PAYABLE:'}</td>
-                  <td class="text-right font-mono">${primarySymbol} ${transaction.total.toFixed(2)} ${primaryCode}</td>
+                  <td class="text-right font-mono">${primarySymbol} ${money(transaction.total)} ${primaryCode}</td>
                 </tr>
                 ${
                   taxFree

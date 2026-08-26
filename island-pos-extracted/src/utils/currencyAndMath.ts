@@ -207,6 +207,8 @@ export interface OrderVerificationInput {
   defaultVatRate?: number;
   /** Add the tourist VAT refund estimate into Total Savings (tax-free option ticked). */
   includeTouristRefund?: boolean;
+  /** Processing fee % deducted from the tourist refund (default 10). */
+  touristFeePercent?: number;
 }
 
 export interface OrderVerification {
@@ -214,8 +216,14 @@ export interface OrderVerification {
   totalDiscount: number;
   /** VAT ÷ net — the effective rate across the cart. */
   effectiveVatRate: number;
-  /** 90% of VAT — estimate shown only when tourist tax-free export is ticked. */
+  /** Net tourist refund after the processing fee (0 when no VAT). */
   touristRefundEstimate: number;
+  /** The full VAT the refund is calculated from. */
+  touristGrossVat: number;
+  /** Processing fee retained from the refund. */
+  touristFeeAmount: number;
+  /** Fee percentage applied (echoes input/settings). */
+  touristFeePercent: number;
   /** Same as totalDiscount — savings can only come from real reductions. */
   totalSavings: number;
   /** totalSavings as a percent of the shelf value (0–100). */
@@ -233,8 +241,15 @@ export function computeOrderVerification(input: OrderVerificationInput): OrderVe
     input.defaultVatRate && input.defaultVatRate > 0 ? input.defaultVatRate : 0.15;
   const effectiveVatRate = net > 0.005 ? Math.max(0, input.vat) / net : fallback;
 
+  const feePercent =
+    input.touristFeePercent !== undefined && input.touristFeePercent >= 0
+      ? input.touristFeePercent
+      : 10;
+  const touristGrossVat = Math.max(0, roundMoney(input.vat || 0));
   const touristRefundEstimate =
-    input.vat > 0 ? computeTouristRefund(input.vat).netRefundAmount : 0;
+    touristGrossVat > 0 ? computeTouristRefund(touristGrossVat, feePercent).netRefundAmount : 0;
+  const touristFeeAmount =
+    touristGrossVat > 0 ? Number((touristGrossVat - touristRefundEstimate).toFixed(2)) : 0;
 
   // Total savings = real reductions, plus the tourist VAT refund estimate when
   // the tax-free export option is chosen (money the customer gets back).
@@ -250,6 +265,9 @@ export function computeOrderVerification(input: OrderVerificationInput): OrderVe
     totalDiscount,
     effectiveVatRate,
     touristRefundEstimate,
+    touristGrossVat,
+    touristFeeAmount,
+    touristFeePercent: feePercent,
     totalSavings,
     savingsPercent,
     hasDiscounts: totalDiscount > 0.005,

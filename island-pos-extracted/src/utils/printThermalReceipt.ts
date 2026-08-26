@@ -23,6 +23,10 @@ export const printThermalReceipt = (
   const secondaryCode = settings.secondaryCurrency || 'USD';
   const exchangeRate = settings.exchangeRate || 1;
   const logoUrl = settings.shopLogoUrl || settings.receiptLogoUrl || settings.brandLogoUrl;
+  // Keep reprints available for transactions created before all monetary fields
+  // were recorded. Printing should degrade to 0.00, never throw.
+  const money = (amount: number | undefined | null) =>
+    (Number.isFinite(amount) ? amount! : 0).toFixed(2);
 
   // Selected roll width configuration
   const actualWidth = settings.thermalReceiptWidth || rollWidth || '80mm';
@@ -68,12 +72,12 @@ export const printThermalReceipt = (
       `
           : `
         <div class="item-details">
-          <span>${Math.abs(item.quantity)} x ${primarySymbol} ${item.unitPrice.toFixed(2)}</span>
-          <span class="font-bold">${primarySymbol} ${item.totalPrice.toFixed(2)}</span>
+          <span>${Math.abs(item.quantity || 0)} x ${primarySymbol} ${money(item.unitPrice)}</span>
+          <span class="font-bold">${primarySymbol} ${money(item.totalPrice)}</span>
         </div>
         ${
           item.isDamaged && item.discountAmount && item.discountAmount > 0
-            ? `<div class="item-discount">- Markdown (${item.damageDiscountPercent || 0}%): -${primarySymbol} ${item.discountAmount.toFixed(2)}</div>`
+            ? `<div class="item-discount">- Markdown (${item.damageDiscountPercent || 0}%): -${primarySymbol} ${money(item.discountAmount)}</div>`
             : ''
         }
         <div class="item-vat">VAT ${( (item.vatRate || 0.15) * 100 ).toFixed(0)}%${settings.vatInclusive ? ' incl.' : ''}: ${primarySymbol} ${(item.vatAmount || 0).toFixed(2)}</div>
@@ -376,14 +380,14 @@ export const printThermalReceipt = (
         <div class="totals">
           <div class="totals-row">
             <span>Subtotal (Net):</span>
-            <span>${primarySymbol} ${transaction.subtotal.toFixed(2)}</span>
+            <span>${primarySymbol} ${money(transaction.subtotal)}</span>
           </div>
           ${
             transaction.itemDiscountTotal && transaction.itemDiscountTotal > 0
               ? `
             <div class="totals-row">
               <span>Item Markdowns:</span>
-              <span>-${primarySymbol} ${transaction.itemDiscountTotal.toFixed(2)}</span>
+              <span>-${primarySymbol} ${money(transaction.itemDiscountTotal)}</span>
             </div>
           `
               : ''
@@ -393,19 +397,19 @@ export const printThermalReceipt = (
               ? `
             <div class="totals-row">
               <span>Order Discount:</span>
-              <span>-${primarySymbol} ${transaction.discount.toFixed(2)}</span>
+              <span>-${primarySymbol} ${money(transaction.discount)}</span>
             </div>
           `
               : ''
           }
           <div class="totals-row">
             <span>VAT Tax Amount${settings.vatInclusive ? ' (Included)' : ''}:</span>
-            <span>${primarySymbol} ${(transaction.vatTotal || transaction.tax || 0).toFixed(2)}</span>
+            <span>${primarySymbol} ${money(transaction.vatTotal || transaction.tax)}</span>
           </div>
 
           <div class="totals-row grand-total">
             <span>${transaction.isRefund ? 'TOTAL REFUNDED:' : 'TOTAL AMOUNT:'}</span>
-            <span>${primarySymbol} ${transaction.total.toFixed(2)}</span>
+            <span>${primarySymbol} ${money(transaction.total)}</span>
           </div>
 
           ${
@@ -436,15 +440,15 @@ export const printThermalReceipt = (
           <div class="secondary-settlement">
             <div class="info-row font-bold">
               <span>Settled in ${secondaryCode}:</span>
-              <span>${secondarySymbol} ${transaction.secondaryTotal.toFixed(2)}</span>
+              <span>${secondarySymbol} ${money(transaction.secondaryTotal)}</span>
             </div>
             <div class="info-row" style="font-size: ${is58mm ? '8px' : '9px'};">
               <span>Applied Rate:</span>
-              <span>1 ${secondaryCode} = ${primarySymbol} ${(transaction.exchangeRateUsed || exchangeRate).toFixed(2)}</span>
+              <span>1 ${secondaryCode} = ${primarySymbol} ${money(transaction.exchangeRateUsed || exchangeRate)}</span>
             </div>
             <div class="info-row" style="font-size: ${is58mm ? '8px' : '9px'};">
               <span>Statutory Base:</span>
-              <span>${primarySymbol} ${transaction.total.toFixed(2)} ${primaryCode}</span>
+              <span>${primarySymbol} ${money(transaction.total)} ${primaryCode}</span>
             </div>
           </div>
         `
@@ -460,8 +464,8 @@ export const printThermalReceipt = (
           <span>
             ${
               transaction.currencyUsed === 'secondary' && transaction.secondaryTotal
-                ? `${secondarySymbol} ${transaction.secondaryTotal.toFixed(2)} ${secondaryCode}`
-                : `${primarySymbol} ${Math.abs(transaction.total).toFixed(2)} ${primaryCode}`
+                ? `${secondarySymbol} ${money(transaction.secondaryTotal)} ${secondaryCode}`
+                : `${primarySymbol} ${money(Math.abs(transaction.total || 0))} ${primaryCode}`
             }
           </span>
         </div>
@@ -479,7 +483,7 @@ export const printThermalReceipt = (
                 (p) => `
               <div class="info-row">
                 <span>${p.method === 'cash' ? 'Cash' : p.method === 'card' ? 'Card' : 'Gift Card'} (${p.currencyCode}):</span>
-                <span>${p.currencySymbol}${p.amountTendered.toFixed(2)} (${primarySymbol}${p.amountInPrimary.toFixed(2)})</span>
+                <span>${p.currencySymbol}${money(p.amountTendered)} (${primarySymbol}${money(p.amountInPrimary)})</span>
               </div>
             `
               )
@@ -497,8 +501,8 @@ export const printThermalReceipt = (
             <span>
               ${
                 transaction.currencyUsed === 'secondary' && transaction.cashGivenSecondary !== undefined
-                  ? `${secondarySymbol} ${transaction.cashGivenSecondary.toFixed(2)} ${secondaryCode}`
-                  : `${primarySymbol} ${transaction.cashGiven.toFixed(2)} ${primaryCode}`
+                  ? `${secondarySymbol} ${money(transaction.cashGivenSecondary)} ${secondaryCode}`
+                  : `${primarySymbol} ${money(transaction.cashGiven)} ${primaryCode}`
               }
             </span>
           </div>
@@ -514,8 +518,8 @@ export const printThermalReceipt = (
             <span>
               ${
                 transaction.currencyUsed === 'secondary' && transaction.changeDueSecondary !== undefined
-                  ? `${secondarySymbol} ${transaction.changeDueSecondary.toFixed(2)} ${secondaryCode}`
-                  : `${primarySymbol} ${transaction.changeDue.toFixed(2)} ${primaryCode}`
+                  ? `${secondarySymbol} ${money(transaction.changeDueSecondary)} ${secondaryCode}`
+                  : `${primarySymbol} ${money(transaction.changeDue)} ${primaryCode}`
               }
             </span>
           </div>
@@ -531,7 +535,7 @@ export const printThermalReceipt = (
             ? `
           <div class="info-row" style="font-size: ${is58mm ? '8px' : '9px'}; font-style: italic;">
             <span>(Change in ${primaryCode}):</span>
-            <span>${primarySymbol} ${(transaction.changeDueSecondary * (transaction.exchangeRateUsed || exchangeRate)).toFixed(2)}</span>
+            <span>${primarySymbol} ${money(transaction.changeDueSecondary * (transaction.exchangeRateUsed || exchangeRate))}</span>
           </div>
         `
             : ''

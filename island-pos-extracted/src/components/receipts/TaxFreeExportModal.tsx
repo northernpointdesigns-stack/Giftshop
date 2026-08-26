@@ -62,7 +62,11 @@ export const TaxFreeExportModal: React.FC<TaxFreeExportModalProps> = ({
   const [refundMethod, setRefundMethod] = useState<'credit_card' | 'airport_cash' | 'bank_transfer'>(
     existing?.refundMethod || 'credit_card'
   );
-  const [adminFeePercent, setAdminFeePercent] = useState<number>(10); // 10% admin processing fee
+  // Processing fee % — store-configured (Settings → taxFreeAdminFeePercent), the
+  // same figure the checkout savings estimate used.
+  const [adminFeePercent, setAdminFeePercent] = useState<number>(
+    settings.taxFreeAdminFeePercent ?? 10
+  );
 
   // VAT calculations — single source of truth shared with the checkout
   // estimate. A stored VAT of 0 is respected (zero-VAT sale → zero refund,
@@ -153,7 +157,20 @@ export const TaxFreeExportModal: React.FC<TaxFreeExportModalProps> = ({
           <div className="bg-[#0F1115] border border-blue-500/30 rounded-xl p-3.5 space-y-2">
             <div className="text-[11px] font-bold text-blue-400 uppercase tracking-wider flex items-center justify-between">
               <span>VAT Tax Refund Calculation</span>
-              <span className="font-mono text-slate-400">TIN: {settings.taxRegistrationNumber || '—'}</span>
+              <span className="flex items-center gap-1.5 normal-case font-normal">
+                <label className="text-[9.5px] text-slate-400">Fee %</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.5"
+                  value={adminFeePercent}
+                  onChange={(e) =>
+                    setAdminFeePercent(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))
+                  }
+                  className="w-14 bg-[#161B22] border border-slate-700 rounded px-1.5 py-0.5 text-[10px] text-white font-mono focus:outline-none focus:border-blue-500"
+                />
+              </span>
             </div>
             <div className="grid grid-cols-3 gap-2 text-center text-xs">
               <div className="bg-[#161B22] p-2 rounded-lg border border-[#1E293B]">

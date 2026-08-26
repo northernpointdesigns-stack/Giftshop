@@ -36,6 +36,11 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
   const secondarySymbol = settings.secondaryCurrencySymbol || '$';
   const secondaryCode = settings.secondaryCurrency || 'USD';
   const exchangeRate = settings.exchangeRate || 1;
+  // Transactions imported from an older build can be missing line-level money
+  // fields. A receipt must never disappear just because a legacy value is
+  // absent: it is the cashier's only route to reprint or send it digitally.
+  const money = (amount: number | undefined | null) =>
+    (Number.isFinite(amount) ? amount! : 0).toFixed(2);
 
   useEffect(() => {
     if (barcodeRef.current && transaction) {
@@ -57,10 +62,16 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
   // Auto-print according to store preference if configured
   const autoPrintFired = useRef(false);
   useEffect(() => {
-    if (settings.autoPrintReceipt && !autoPrintFired.current) {
+    // “Ask every time” is deliberately manual: retain this modal so the
+    // cashier can choose a paper format or a digital delivery method.
+    const automaticFormat =
+      settings.receiptPrinterType === 'normal' || settings.receiptPrinterType === 'thermal'
+        ? settings.receiptPrinterType
+        : null;
+    if (settings.autoPrintReceipt && automaticFormat && !autoPrintFired.current) {
       autoPrintFired.current = true;
       const t = setTimeout(() => {
-        if (settings.receiptPrinterType === 'normal') {
+        if (automaticFormat === 'normal') {
           printStandardInvoice(transaction, settings, { isGiftReceipt: isGiftView });
         } else {
           printThermalReceipt(transaction, settings, settings.thermalReceiptWidth || '80mm', { isGiftReceipt: isGiftView });
@@ -232,12 +243,12 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
                         )}
                       </span>
                       <span className={item.totalPrice < 0 ? 'text-rose-700 font-bold' : ''}>
-                        {primarySymbol} {item.totalPrice.toFixed(2)}
+                        {primarySymbol} {money(item.totalPrice)}
                       </span>
                     </div>
                     <div className="flex justify-between text-[10px] text-slate-500">
                       <span>
-                        {Math.abs(item.quantity)} x {primarySymbol} {item.unitPrice.toFixed(2)}{' '}
+                        {Math.abs(item.quantity || 0)} x {primarySymbol} {money(item.unitPrice)}{' '}
                         {item.size ? `(${item.size})` : ''}
                       </span>
                       <span className="text-[9px] uppercase tracking-tight text-slate-500">
@@ -253,27 +264,27 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
             <div className="py-2.5 border-b border-dashed border-slate-300 space-y-1 text-right">
               <div className="flex justify-between text-slate-600">
                 <span>Subtotal (Net):</span>
-                <span>{primarySymbol} {transaction.subtotal.toFixed(2)}</span>
+                <span>{primarySymbol} {money(transaction.subtotal)}</span>
               </div>
               {!!transaction.itemDiscountTotal && transaction.itemDiscountTotal > 0 && (
                 <div className="flex justify-between text-amber-700">
                   <span>Item Discounts (Damaged):</span>
-                  <span>-{primarySymbol} {transaction.itemDiscountTotal.toFixed(2)}</span>
+                  <span>-{primarySymbol} {money(transaction.itemDiscountTotal)}</span>
                 </div>
               )}
               {transaction.discount > 0 && (
                 <div className="flex justify-between text-rose-600">
                   <span>Discount{transaction.discountType === 'percent' ? ' (%)' : ''}:</span>
-                  <span>-{primarySymbol} {transaction.discount.toFixed(2)}</span>
+                  <span>-{primarySymbol} {money(transaction.discount)}</span>
                 </div>
               )}
               <div className="flex justify-between text-slate-700 font-semibold">
                 <span>VAT Tax Amount{settings.vatInclusive ? ' (Included)' : ''}:</span>
-                <span>{primarySymbol} {(transaction.vatTotal || transaction.tax || 0).toFixed(2)}</span>
+                <span>{primarySymbol} {money(transaction.vatTotal || transaction.tax)}</span>
               </div>
               <div className={`flex justify-between font-bold text-sm pt-1 border-t border-slate-300 ${transaction.isRefund ? 'text-rose-700 font-sans' : 'text-slate-900'}`}>
                 <span>{transaction.isRefund ? 'TOTAL REFUNDED:' : 'TOTAL AMOUNT:'}</span>
-                <span>{primarySymbol} {transaction.total.toFixed(2)}</span>
+                <span>{primarySymbol} {money(transaction.total)}</span>
               </div>
 
               {/* SECONDARY CURRENCY TOTAL SECTION */}
@@ -281,10 +292,10 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
                 <div className="pt-1.5 text-[11px] text-cyan-800 font-bold border-t border-dotted border-slate-300 space-y-0.5">
                   <div className="flex justify-between">
                     <span>In Paid Currency ({secondaryCode}):</span>
-                    <span>{secondarySymbol}{transaction.secondaryTotal.toFixed(2)}</span>
+                    <span>{secondarySymbol}{money(transaction.secondaryTotal)}</span>
                   </div>
                   <div className="text-[9px] text-slate-500 text-right">
-                    Rate: 1 {secondaryCode} = {primarySymbol} {(transaction.exchangeRateUsed || exchangeRate).toFixed(2)}
+                    Rate: 1 {secondaryCode} = {primarySymbol} {money(transaction.exchangeRateUsed || exchangeRate)}
                   </div>
                 </div>
               )}
@@ -296,8 +307,8 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
                 <span className="capitalize">{transaction.isRefund ? 'Refunded via' : 'Paid via'} {transaction.paymentMethod}:</span>
                 <span className="font-bold text-slate-900">
                   {transaction.currencyUsed === 'secondary' && transaction.secondaryTotal
-                    ? `${secondarySymbol}${transaction.secondaryTotal.toFixed(2)} ${secondaryCode}`
-                    : `${primarySymbol} ${Math.abs(transaction.total).toFixed(2)} ${primaryCode}`}
+                    ? `${secondarySymbol}${money(transaction.secondaryTotal)} ${secondaryCode}`
+                    : `${primarySymbol} ${money(Math.abs(transaction.total || 0))} ${primaryCode}`}
                 </span>
               </div>
 
@@ -311,7 +322,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
                     <div key={i} className="flex justify-between text-slate-700">
                       <span>{p.method === 'cash' ? 'Cash' : p.method === 'card' ? 'Card' : 'Gift Card'} ({p.currencyCode}):</span>
                       <span className="font-mono font-bold">
-                        {p.currencySymbol}{p.amountTendered.toFixed(2)} ({primarySymbol}{p.amountInPrimary.toFixed(2)})
+                        {p.currencySymbol}{money(p.amountTendered)} ({primarySymbol}{money(p.amountInPrimary)})
                       </span>
                     </div>
                   ))}
@@ -322,8 +333,8 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
                   <span>Cash Tendered:</span>
                   <span>
                     {transaction.currencyUsed === 'secondary' && transaction.cashGivenSecondary !== undefined
-                      ? `${secondarySymbol}${transaction.cashGivenSecondary.toFixed(2)} ${secondaryCode}`
-                      : `${primarySymbol} ${transaction.cashGiven.toFixed(2)} ${primaryCode}`}
+                      ? `${secondarySymbol}${money(transaction.cashGivenSecondary)} ${secondaryCode}`
+                      : `${primarySymbol} ${money(transaction.cashGiven)} ${primaryCode}`}
                   </span>
                 </div>
               )}
@@ -332,15 +343,15 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
                   <span>Change Due:</span>
                   <span>
                     {transaction.currencyUsed === 'secondary' && transaction.changeDueSecondary !== undefined
-                      ? `${secondarySymbol}${transaction.changeDueSecondary.toFixed(2)} ${secondaryCode}`
-                      : `${primarySymbol} ${transaction.changeDue.toFixed(2)} ${primaryCode}`}
+                      ? `${secondarySymbol}${money(transaction.changeDueSecondary)} ${secondaryCode}`
+                      : `${primarySymbol} ${money(transaction.changeDue)} ${primaryCode}`}
                   </span>
                 </div>
               )}
               {transaction.currencyUsed === 'secondary' && transaction.paymentMethod === 'cash' && transaction.changeDueSecondary !== undefined && transaction.changeDueSecondary > 0 && (
                 <div className="flex justify-between text-slate-500 italic text-[10px]">
                   <span>Change Back in {primaryCode}:</span>
-                  <span>{primarySymbol} {(transaction.changeDueSecondary * (transaction.exchangeRateUsed || exchangeRate)).toFixed(2)}</span>
+                  <span>{primarySymbol} {money(transaction.changeDueSecondary * (transaction.exchangeRateUsed || exchangeRate))}</span>
                 </div>
               )}
             </div>

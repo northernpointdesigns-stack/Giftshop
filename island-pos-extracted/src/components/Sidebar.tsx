@@ -15,7 +15,6 @@ import {
   ChevronRight,
   ChevronDown,
   Database,
-  Monitor,
   AlertTriangle,
   SlidersHorizontal,
   Globe,
@@ -47,7 +46,6 @@ interface SidebarProps {
   };
   lowStockCount: number;
   onOpenLowStockModal: () => void;
-  onOpenCustomerDisplay: () => void;
   onOpenSqlInspector: () => void;
   onOpenQuickRecovery: () => void;
   isOpenMobile: boolean;
@@ -79,7 +77,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   cashierAccess,
   lowStockCount,
   onOpenLowStockModal,
-  onOpenCustomerDisplay,
   onOpenSqlInspector,
   onOpenQuickRecovery,
   isOpenMobile,
@@ -620,14 +617,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span>SQLite</span>
             </button>
           )}
-          <button
-            onClick={onOpenCustomerDisplay}
-            className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-[#1E293B] text-[10px] text-slate-400 hover:text-emerald-400 transition-colors flex items-center justify-center gap-1 w-full"
-            title="Dual Customer Display"
-          >
-            <Monitor className="w-3 h-3 text-emerald-500" />
-            <span>Dual Disp</span>
-          </button>
         </div>
 
         {/* User Account Bar */}

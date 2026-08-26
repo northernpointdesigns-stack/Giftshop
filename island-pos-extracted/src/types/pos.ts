@@ -307,6 +307,9 @@ export interface StoreSettings {
   posViewMode?: 'grid' | 'quick';
   // Print receipt automatically when payment amount is entered at checkout
   autoPrintReceipt?: boolean;
+  // Tourist tax-free export processing fee (%) deducted from the VAT refund.
+  // Used by BOTH the checkout savings estimate and the printed certificate.
+  taxFreeAdminFeePercent?: number;
   // Force a backup download when closing the day (EOD)
   requireBackupOnDayClose?: boolean;
   lastBackupAt?: string;

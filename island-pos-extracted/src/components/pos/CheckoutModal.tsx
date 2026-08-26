@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   X,
   CreditCard,
@@ -97,6 +97,66 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     () => (settings.defaultCurrencyMode === 'secondary' ? 'secondary' : 'primary')
   );
 
+  // --- Floating window: drag by the header, resize by the corner grip -----
+  // Geometry persists per device; null = default centered layout.
+  const GEOM_KEY = 'giftshop:checkout-window';
+  interface WinGeom { x: number; y: number; w: number; h: number }
+  const clampGeom = (g: WinGeom): WinGeom => {
+    const minW = 620, minH = 440;
+    const w = Math.min(Math.max(g.w, minW), Math.max(minW, window.innerWidth - 16));
+    const h = Math.min(Math.max(g.h, minH), Math.max(minH, window.innerHeight - 12));
+    const x = Math.min(Math.max(g.x, 8), Math.max(8, window.innerWidth - w - 8));
+    const y = Math.min(Math.max(g.y, 6), Math.max(6, window.innerHeight - h - 6));
+    return { x, y, w, h };
+  };
+  const [geom, setGeom] = useState<WinGeom | null>(() => {
+    try {
+      const raw = localStorage.getItem(GEOM_KEY);
+      if (!raw) return null;
+      const g = JSON.parse(raw);
+      if (typeof g?.x !== 'number' || typeof g?.y !== 'number' || typeof g?.w !== 'number' || typeof g?.h !== 'number') return null;
+      return clampGeom(g as WinGeom);
+    } catch { return null; }
+  });
+  const winDragRef = useRef<{ mode: 'move' | 'resize'; px: number; py: number; orig: WinGeom } | null>(null);
+
+  const startWindowDrag = (mode: 'move' | 'resize') => (e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const base: WinGeom =
+      geom ?? (() => {
+        const w = Math.min(1152, vw - 32);
+        const h = Math.min(vh - 24, Math.max(440, Math.round(vh * 0.94)));
+        return { w, h, x: Math.max(8, Math.round((vw - w) / 2)), y: Math.max(6, Math.round((vh - h) / 2)) };
+      })();
+    winDragRef.current = { mode, px: e.clientX, py: e.clientY, orig: base };
+    setGeom(base);
+    (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
+  };
+  const onWindowPointerMove = (e: React.PointerEvent) => {
+    const d = winDragRef.current;
+    if (!d) return;
+    const dx = e.clientX - d.px, dy = e.clientY - d.py;
+    setGeom(
+      d.mode === 'move'
+        ? clampGeom({ ...d.orig, x: d.orig.x + dx, y: d.orig.y + dy })
+        : clampGeom({ ...d.orig, w: d.orig.w + dx, h: d.orig.h + dy })
+    );
+  };
+  const endWindowDrag = () => {
+    if (!winDragRef.current) return;
+    winDragRef.current = null;
+    setGeom((g) => {
+      if (g) { try { localStorage.setItem(GEOM_KEY, JSON.stringify(g)); } catch { /* ignore */ } }
+      return g;
+    });
+  };
+  const resetWindow = () => {
+    winDragRef.current = null;
+    setGeom(null);
+    try { localStorage.removeItem(GEOM_KEY); } catch { /* ignore */ }
+  };
+
   // Split Payment & Currency Mixing State
   const [splitLines, setSplitLines] = useState<SplitPaymentLine[]>([]);
   const [splitMethod, setSplitMethod] = useState<'cash' | 'card' | 'gift_card'>('cash');
@@ -169,6 +229,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     vatInclusive,
     defaultVatRate: settings.defaultVatRate,
     includeTouristRefund: isTaxFreeNeeded,
+    touristFeePercent: settings.taxFreeAdminFeePercent ?? 10,
   });
   const { totalDiscount: totalDiscountApplied, effectiveVatRate } = verification;
 
@@ -398,10 +459,27 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#0F1115]/80 flex items-center justify-center p-2 sm:p-4">
-      <div className="bg-[#161B22] border border-[#1E293B] rounded-2xl max-w-6xl w-full text-[#E2E8F0] shadow-2xl relative max-h-[94vh] flex flex-col overflow-hidden">
-        {/* Header (compact) */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-[#1E293B] shrink-0">
+    <div
+      className="fixed inset-0 z-50 bg-[#0F1115]/80 flex items-center justify-center p-2 sm:p-4"
+      onPointerMove={onWindowPointerMove}
+      onPointerUp={endWindowDrag}
+      onPointerCancel={endWindowDrag}
+    >
+      <div
+        className="bg-[#161B22] border border-[#1E293B] rounded-2xl max-w-6xl w-full text-[#E2E8F0] shadow-2xl relative max-h-[94vh] flex flex-col overflow-hidden"
+        style={
+          geom
+            ? { position: 'fixed', left: geom.x, top: geom.y, width: geom.w, height: geom.h, maxWidth: 'none', maxHeight: 'none' }
+            : undefined
+        }
+      >
+        {/* Header (compact) — drag to move, double-click to reset position */}
+        <div
+          className="flex items-center justify-between px-5 py-3 border-b border-[#1E293B] shrink-0 cursor-move select-none touch-none"
+          onPointerDown={startWindowDrag('move')}
+          onDoubleClick={resetWindow}
+          title="Drag to move — double-click to reset"
+        >
           <div>
             <h2 className="text-lg font-bold text-[#E2E8F0] flex items-center gap-2">
               <DollarSign className="w-5 h-5 text-emerald-400" /> Complete Sale
@@ -412,10 +490,22 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           </div>
           <button
             onClick={onClose}
+            onPointerDown={(e) => e.stopPropagation()}
             className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
+        </div>
+
+        {/* Resize grip (bottom-right corner) */}
+        <div
+          onPointerDown={startWindowDrag('resize')}
+          className="absolute bottom-0 right-0 w-5 h-5 cursor-nwse-resize touch-none z-10"
+          title="Drag to resize"
+        >
+          <svg viewBox="0 0 20 20" className="w-full h-full text-slate-500">
+            <path d="M19 7 L7 19 M19 12 L12 19 M19 17 L17 19" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+          </svg>
         </div>
 
         <form onSubmit={handleSubmitPayment} className="flex-1 flex flex-col lg:flex-row min-h-0 overflow-hidden">
@@ -737,7 +827,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   </div>
                   {isTaxFreeNeeded && tax > 0 && (
                     <div className="truncate text-blue-300 font-semibold">
-                      ✈️ Tourist refund est.: {primarySymbol} {verification.touristRefundEstimate.toFixed(2)}
+                      ✈️ Gross refund: {primarySymbol} {verification.touristGrossVat.toFixed(2)}
+                      {' '}− {verification.touristFeePercent}% fee ({primarySymbol} {verification.touristFeeAmount.toFixed(2)})
                     </div>
                   )}
                 </div>
@@ -763,7 +854,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   )}
                   {isTaxFreeNeeded && verification.touristRefundEstimate > 0 && (
                     <div className="truncate text-blue-300 font-semibold">
-                      • ✈️ Tourist refund: {primarySymbol} {verification.touristRefundEstimate.toFixed(2)}
+                      • ✈️ Tourist refund: {primarySymbol} {verification.touristRefundEstimate.toFixed(2)} (after {verification.touristFeePercent}% fee)
                     </div>
                   )}
                   {verification.totalSavings === 0 && (
