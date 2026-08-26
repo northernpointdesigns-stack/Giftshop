@@ -152,7 +152,9 @@ export const TaxFreeExportModal: React.FC<TaxFreeExportModalProps> = ({
                 </div>
               </div>
               <div className="bg-[#161B22] p-2 rounded-lg border border-[#1E293B]">
-                <div className="text-[10px] text-slate-400">15% Included VAT</div>
+                <div className="text-[10px] text-slate-400">
+                  {totalGross > 0 ? ((totalVat / totalGross) * 100).toFixed(1) : '15.0'}% Included VAT
+                </div>
                 <div className="font-mono font-bold text-cyan-400 mt-0.5">
                   {primarySymbol} {totalVat.toFixed(2)}
                 </div>

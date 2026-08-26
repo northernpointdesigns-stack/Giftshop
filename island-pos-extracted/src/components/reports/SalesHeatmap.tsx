@@ -199,7 +199,7 @@ export const SalesHeatmap: React.FC<SalesHeatmapProps> = ({
       }
 
       if (brandFilter !== 'all') {
-        const hasBrand = tx.items.some((item) => (item.brand || 'Ocean Seychelles') === brandFilter);
+        const hasBrand = tx.items.some((item) => (item.brand || 'Unbranded') === brandFilter);
         if (!hasBrand) return false;
       }
 
@@ -239,7 +239,7 @@ export const SalesHeatmap: React.FC<SalesHeatmapProps> = ({
       if (categoryFilter !== 'all' || brandFilter !== 'all') {
         const matchingItems = tx.items.filter((item) => {
           if (categoryFilter !== 'all' && item.category !== categoryFilter) return false;
-          if (brandFilter !== 'all' && (item.brand || 'Ocean Seychelles') !== brandFilter) return false;
+          if (brandFilter !== 'all' && (item.brand || 'Unbranded') !== brandFilter) return false;
           return true;
         });
         txRevenue = matchingItems.reduce((sum, i) => sum + i.totalPrice, 0);
@@ -637,7 +637,7 @@ export const SalesHeatmap: React.FC<SalesHeatmapProps> = ({
           const lineTotal = item.retailPrice * ci.quantity;
           const vatRate = item.vatRate ?? (settings.defaultVatRate ?? 0.15);
           const vatAmt = Number((lineTotal * vatRate).toFixed(2));
-          const costBasis = item.costBasis || (item.retailPrice * 0.5);
+          const costBasis = item.costBasis || 0;
 
           let vendorPayout = 0;
           let houseProfit = 0;
@@ -654,9 +654,9 @@ export const SalesHeatmap: React.FC<SalesHeatmapProps> = ({
             itemId: item.id,
             name: item.name,
             sku: item.sku,
-            brand: item.brand || 'Ocean Seychelles',
+            brand: item.brand || vendor?.brandName || 'Unbranded',
             category: item.category,
-            productLine: item.productLine || 'Standard',
+            productLine: item.productLine || 'Unclassified Line',
             size: item.size || 'One Size',
             quantity: ci.quantity,
             unitPrice: item.retailPrice,
@@ -664,7 +664,7 @@ export const SalesHeatmap: React.FC<SalesHeatmapProps> = ({
             vatRate,
             vatAmount: vatAmt,
             vendorId: item.vendorId || 'VEND-1',
-            vendorName: vendor?.name || 'Local Artisan',
+            vendorName: vendor?.name || 'Unknown Vendor',
             supplierType: isConsignment ? ('consignment' as const) : ('wholesale' as const),
             costBasis,
             vendorPayoutAmount: Number(vendorPayout.toFixed(2)),

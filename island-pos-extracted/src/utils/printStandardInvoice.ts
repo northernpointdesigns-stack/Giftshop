@@ -21,6 +21,15 @@ export const printStandardInvoice = (
   const exchangeRate = settings.exchangeRate || 13.50;
   const logoUrl = settings.shopLogoUrl || settings.receiptLogoUrl || settings.brandLogoUrl;
 
+  // Effective VAT rate for this transaction, blended from the actual amounts —
+  // never assume a fixed statutory percentage.
+  const vatAmountTotal = transaction.vatTotal || transaction.tax || 0;
+  const vatNetBase = Math.max((transaction.subtotal || 0) - (transaction.discount || 0), 0);
+  const vatPctStr =
+    vatNetBase > 0
+      ? `${((vatAmountTotal / vatNetBase) * 100).toFixed(1)}%`
+      : `${(((transaction.items?.[0]?.vatRate ?? settings.defaultVatRate) || 0) * 100).toFixed(1)}%`;
+
   // Generate Barcode
   let barcodeHtml = '';
   try {
@@ -467,7 +476,7 @@ export const printStandardInvoice = (
           <div>
             <div class="currency-declaration-title">Official Accounting & Tax Base Currency</div>
             <div class="currency-declaration-desc">
-              All line items, statutory VAT (15%), and tax balances are audited and recorded in <strong>${primaryCode} (${primarySymbol})</strong>.
+              All line items, statutory VAT (${vatPctStr}), and tax balances are audited and recorded in <strong>${primaryCode} (${primarySymbol})</strong>.
             </div>
           </div>
           <div class="currency-badge">
@@ -728,7 +737,7 @@ export const printStandardInvoice = (
                     : ''
                 }
                 <tr>
-                  <td class="text-muted">Statutory VAT (15% Tax):</td>
+                  <td class="text-muted">Statutory VAT (${vatPctStr} Tax):</td>
                   <td class="text-right font-mono font-semibold">${primarySymbol} ${(transaction.vatTotal || transaction.tax || 0).toFixed(2)}</td>
                 </tr>
                 <tr class="grand-total-row">

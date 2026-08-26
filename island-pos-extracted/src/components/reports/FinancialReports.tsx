@@ -79,13 +79,30 @@ export const FinancialReports: React.FC<FinancialReportsProps> = ({
   // Category sales map
   const categorySalesMap: Record<string, { revenue: number; units: number }> = {};
 
+  // Product line sales map (all brands, derived from transaction line items)
+  const productLineMap: Record<string, { revenue: number; units: number }> = {};
+
+  // Size / variant breakdown map (category + size)
+  const sizeBreakdownMap: Record<
+    string,
+    { category: string; size: string; revenue: number; units: number }
+  > = {};
+
+  // Historical FX tracking: transaction totals converted at each sale's snapshot rate
+  let historicalSecondaryTotal = 0;
+
   filteredTx.forEach((tx) => {
     grossSales += tx.subtotal;
     totalVatCollected += tx.vatTotal || tx.tax || 0;
     totalDiscountsGiven += tx.discount;
 
+    // Use the exchange-rate snapshot locked at checkout when available,
+    // falling back to the current settings rate for legacy transactions.
+    const txRate = tx.exchangeRateUsed && tx.exchangeRateUsed > 0 ? tx.exchangeRateUsed : exchangeRate;
+    historicalSecondaryTotal += tx.total / txRate;
+
     tx.items.forEach((item) => {
-      const brandName = item.brand || 'Ocean Seychelles';
+      const brandName = item.brand || 'Unbranded';
 
       // Brand Map
       if (!brandMap[brandName]) {
@@ -113,6 +130,25 @@ export const FinancialReports: React.FC<FinancialReportsProps> = ({
       categorySalesMap[item.category].revenue += item.totalPrice;
       categorySalesMap[item.category].units += item.quantity;
 
+      // Product Line Map
+      const lineName = item.productLine || 'Unclassified Line';
+      if (!productLineMap[lineName]) productLineMap[lineName] = { revenue: 0, units: 0 };
+      productLineMap[lineName].revenue += item.totalPrice;
+      productLineMap[lineName].units += item.quantity;
+
+      // Size / Variant Map
+      const sizeKey = `${item.category} · ${item.size || 'One Size'}`;
+      if (!sizeBreakdownMap[sizeKey]) {
+        sizeBreakdownMap[sizeKey] = {
+          category: item.category,
+          size: item.size || 'One Size',
+          revenue: 0,
+          units: 0,
+        };
+      }
+      sizeBreakdownMap[sizeKey].revenue += item.totalPrice;
+      sizeBreakdownMap[sizeKey].units += item.quantity;
+
       if (item.supplierType === 'consignment') {
         consignmentGrossSales += item.totalPrice;
         consignmentVendorPayouts += item.vendorPayoutAmount;
@@ -129,6 +165,16 @@ export const FinancialReports: React.FC<FinancialReportsProps> = ({
   const totalHouseProfit = wholesaleNetProfit + consignmentHouseCommissions;
   const grandTotalWithVat = totalNetRevenue + totalVatCollected;
 
+  // Blended exchange rate actually in effect at the time of the sales in this
+  // cycle (falls back to the current settings rate when no snapshots exist).
+  const fxRate = historicalSecondaryTotal > 0 ? grandTotalWithVat / historicalSecondaryTotal : exchangeRate;
+
+  // Effective VAT rate actually collected this cycle (blended across line-item
+  // rates), falling back to the configured default when there is no data.
+  const vatBase = Math.max(grossSales - totalDiscountsGiven, 0);
+  const effectiveVatPct =
+    vatBase > 0 ? (totalVatCollected / vatBase) * 100 : (settings.defaultVatRate || 0) * 100;
+
   // Peak shopping hour calculation for this cycle
   const hourlyCountMap: Record<number, { revenue: number; txCount: number }> = {};
   filteredTx.forEach((tx) => {
@@ -137,7 +183,7 @@ export const FinancialReports: React.FC<FinancialReportsProps> = ({
     hourlyCountMap[h].revenue += tx.subtotal;
     hourlyCountMap[h].txCount += 1;
   });
-  let peakHourNum = 14;
+  let peakHourNum = 0;
   let peakHourRevenue = 0;
   let peakHourTx = 0;
   Object.entries(hourlyCountMap).forEach(([h, data]) => {
@@ -148,75 +194,60 @@ export const FinancialReports: React.FC<FinancialReportsProps> = ({
     }
   });
 
-  // Ocean Seychelles Mug Line Comparison (Luxury vs Normal)
-  let luxuryMugUnits = 0;
-  let luxuryMugRevenue = 0;
-  let normalMugUnits = 0;
-  let normalMugRevenue = 0;
-
-  const oceanItems = brandMap['Ocean Seychelles']?.items || {};
-  Object.entries(oceanItems).forEach(([itemName, data]) => {
-    if (itemName.toLowerCase().includes('mug')) {
-      if (data.line.toLowerCase().includes('luxury') || itemName.toLowerCase().includes('luxury')) {
-        luxuryMugUnits += data.qty;
-        luxuryMugRevenue += data.revenue;
-      } else {
-        normalMugUnits += data.qty;
-        normalMugRevenue += data.revenue;
-      }
-    }
-  });
-
-  // Ocean Seychelles T-Shirt breakdown by Target/Size
-  let kidsTshirtQty = 0;
-  let adultsTshirtQty = 0;
-  let womenTshirtQty = 0;
-
-  Object.entries(oceanItems).forEach(([itemName, data]) => {
-    if (itemName.toLowerCase().includes('t-shirt') || itemName.toLowerCase().includes('tee')) {
-      const sizeLower = (data.size + ' ' + itemName).toLowerCase();
-      if (sizeLower.includes('kid') || sizeLower.includes('child')) {
-        kidsTshirtQty += data.qty;
-      } else if (sizeLower.includes('women') || sizeLower.includes('lady')) {
-        womenTshirtQty += data.qty;
-      } else {
-        adultsTshirtQty += data.qty;
-      }
-    }
-  });
+  // Top product lines & size/variant buckets — fully derived from transaction data
+  const topProductLines = Object.entries(productLineMap).sort((a, b) => b[1].revenue - a[1].revenue);
+  const topSizeBuckets = Object.entries(sizeBreakdownMap)
+    .sort((a, b) => b[1].revenue - a[1].revenue)
+    .slice(0, 6);
 
   // Export CSV Report for Selected Cycle
   const handleExportCsv = () => {
     let csvStr = `Cycle Financial Performance Report (${cycle.toUpperCase()})\n`;
     csvStr += `Generated At,${new Date().toLocaleString()}\n`;
-    csvStr += `Exchange Rate Used,1 ${secondaryCode} = ${primarySymbol} ${exchangeRate.toFixed(2)}\n\n`;
+    csvStr += `Blended Exchange Rate (at time of sale),1 ${secondaryCode} = ${primarySymbol} ${fxRate.toFixed(2)}\n\n`;
 
     csvStr += `Financial Metric,Amount in Base (${primaryCode}),Amount in Preferred (${secondaryCode})\n`;
-    csvStr += `Net Sales Subtotal,${grossSales.toFixed(2)},${(grossSales / exchangeRate).toFixed(2)}\n`;
-    csvStr += `VAT Tax Collected (15%),${totalVatCollected.toFixed(2)},${(totalVatCollected / exchangeRate).toFixed(2)}\n`;
-    csvStr += `Grand Total Revenue (Incl. VAT),${grandTotalWithVat.toFixed(2)},${(grandTotalWithVat / exchangeRate).toFixed(2)}\n`;
-    csvStr += `Wholesale Cost of Goods (COGS),${wholesaleCostOfGoods.toFixed(2)},${(wholesaleCostOfGoods / exchangeRate).toFixed(2)}\n`;
-    csvStr += `Consignment Depositor Payouts,${consignmentVendorPayouts.toFixed(2)},${(consignmentVendorPayouts / exchangeRate).toFixed(2)}\n`;
-    csvStr += `House Net Profit,${totalHouseProfit.toFixed(2)},${(totalHouseProfit / exchangeRate).toFixed(2)}\n\n`;
+    csvStr += `Net Sales Subtotal,${grossSales.toFixed(2)},${(grossSales / fxRate).toFixed(2)}\n`;
+    csvStr += `VAT Tax Collected (${effectiveVatPct.toFixed(1)}%),${totalVatCollected.toFixed(2)},${(totalVatCollected / fxRate).toFixed(2)}\n`;
+    csvStr += `Grand Total Revenue (Incl. VAT),${grandTotalWithVat.toFixed(2)},${(grandTotalWithVat / fxRate).toFixed(2)}\n`;
+    csvStr += `Wholesale Cost of Goods (COGS),${wholesaleCostOfGoods.toFixed(2)},${(wholesaleCostOfGoods / fxRate).toFixed(2)}\n`;
+    csvStr += `Consignment Depositor Payouts,${consignmentVendorPayouts.toFixed(2)},${(consignmentVendorPayouts / fxRate).toFixed(2)}\n`;
+    csvStr += `House Net Profit,${totalHouseProfit.toFixed(2)},${(totalHouseProfit / fxRate).toFixed(2)}\n\n`;
 
     csvStr += `Brand Performance\n`;
     csvStr += `Brand,Units Sold,Gross Revenue (${primaryCode}),Gross Revenue (${secondaryCode}),VAT Tax (${primaryCode}),VAT Tax (${secondaryCode})\n`;
     Object.entries(brandMap).forEach(([bName, data]) => {
-      csvStr += `"${bName}",${data.units},${data.gross.toFixed(2)},${(data.gross / exchangeRate).toFixed(2)},${data.vat.toFixed(2)},${(data.vat / exchangeRate).toFixed(2)}\n`;
+      csvStr += `"${bName}",${data.units},${data.gross.toFixed(2)},${(data.gross / fxRate).toFixed(2)},${data.vat.toFixed(2)},${(data.vat / fxRate).toFixed(2)}\n`;
     });
     csvStr += `\n`;
 
     csvStr += `Category Performance\n`;
     csvStr += `Category,Units Sold,Revenue (${primaryCode}),Revenue (${secondaryCode})\n`;
     Object.entries(categorySalesMap).forEach(([catName, stats]) => {
-      csvStr += `"${catName}",${stats.units},${stats.revenue.toFixed(2)},${(stats.revenue / exchangeRate).toFixed(2)}\n`;
+      csvStr += `"${catName}",${stats.units},${stats.revenue.toFixed(2)},${(stats.revenue / fxRate).toFixed(2)}\n`;
     });
+
+    csvStr += `\nProduct Line Performance\n`;
+    csvStr += `Product Line,Units Sold,Revenue (${primaryCode}),Revenue (${secondaryCode}),Avg Price per Unit (${primaryCode})\n`;
+    topProductLines.forEach(([lineName, stats]) => {
+      const avgPrice = stats.units > 0 ? stats.revenue / stats.units : 0;
+      csvStr += `"${lineName}",${stats.units},${stats.revenue.toFixed(2)},${(stats.revenue / fxRate).toFixed(2)},${avgPrice.toFixed(2)}\n`;
+    });
+
+    csvStr += `\nSize / Variant Breakdown\n`;
+    csvStr += `Category,Size,Units Sold,Revenue (${primaryCode}),Revenue (${secondaryCode}),Avg Price per Unit (${primaryCode})\n`;
+    Object.entries(sizeBreakdownMap)
+      .sort((a, b) => b[1].revenue - a[1].revenue)
+      .forEach(([key, stats]) => {
+        const avgPrice = stats.units > 0 ? stats.revenue / stats.units : 0;
+        csvStr += `"${stats.category}","${stats.size}",${stats.units},${stats.revenue.toFixed(2)},${(stats.revenue / fxRate).toFixed(2)},${avgPrice.toFixed(2)}\n`;
+      });
 
     const blob = new Blob([csvStr], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', `Seychelles_Financial_Report_${cycle}_${Date.now()}.csv`);
+    link.setAttribute('download', `Financial_Report_${cycle}_${Date.now()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -307,7 +338,7 @@ export const FinancialReports: React.FC<FinancialReportsProps> = ({
           </div>
           {settings.allowPaymentInSecondary !== false && (
             <div className="text-[11px] font-mono font-bold text-cyan-400">
-              {secondarySymbol}{(grossSales / exchangeRate).toFixed(2)} {secondaryCode}
+              {secondarySymbol}{(grossSales / fxRate).toFixed(2)} {secondaryCode}
             </div>
           )}
           <div className="text-[11px] text-slate-500 mt-0.5">
@@ -317,14 +348,14 @@ export const FinancialReports: React.FC<FinancialReportsProps> = ({
 
         <div className="bg-[#161B22] border border-cyan-500/40 rounded-xl p-4 shadow-sm">
           <div className="text-xs text-cyan-300 font-semibold uppercase tracking-wider flex items-center gap-1">
-            <Percent className="w-3.5 h-3.5" /> VAT Tax Collected (15%)
+            <Percent className="w-3.5 h-3.5" /> VAT Tax Collected ({effectiveVatPct.toFixed(1)}%)
           </div>
           <div className="text-2xl font-black font-mono text-cyan-400 my-1">
             {primarySymbol} {totalVatCollected.toFixed(2)}
           </div>
           {settings.allowPaymentInSecondary !== false && (
             <div className="text-[11px] font-mono font-bold text-slate-400">
-              {secondarySymbol}{(totalVatCollected / exchangeRate).toFixed(2)} {secondaryCode}
+              {secondarySymbol}{(totalVatCollected / fxRate).toFixed(2)} {secondaryCode}
             </div>
           )}
           <div className="text-[11px] text-cyan-400/80 mt-0.5">
@@ -341,7 +372,7 @@ export const FinancialReports: React.FC<FinancialReportsProps> = ({
           </div>
           {settings.allowPaymentInSecondary !== false && (
             <div className="text-[11px] font-mono font-bold text-cyan-400">
-              {secondarySymbol}{(totalHouseProfit / exchangeRate).toFixed(2)} {secondaryCode}
+              {secondarySymbol}{(totalHouseProfit / fxRate).toFixed(2)} {secondaryCode}
             </div>
           )}
           <div className="text-[11px] text-emerald-400/80 mt-0.5">
@@ -358,7 +389,7 @@ export const FinancialReports: React.FC<FinancialReportsProps> = ({
           </div>
           {settings.allowPaymentInSecondary !== false && (
             <div className="text-[11px] font-mono font-bold text-cyan-400">
-              {secondarySymbol}{(grandTotalWithVat / exchangeRate).toFixed(2)} {secondaryCode}
+              {secondarySymbol}{(grandTotalWithVat / fxRate).toFixed(2)} {secondaryCode}
             </div>
           )}
           <div className="text-[11px] text-slate-500 mt-0.5">Includes Net Sales + VAT</div>
@@ -366,7 +397,7 @@ export const FinancialReports: React.FC<FinancialReportsProps> = ({
       </div>
 
       {/* Peak Shopping Hour Quick Highlight Banner */}
-      {filteredTx.length > 0 && (
+      {filteredTx.length > 0 && peakHourRevenue > 0 && (
         <div className="bg-[#161B22] border border-amber-500/30 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
@@ -398,7 +429,7 @@ export const FinancialReports: React.FC<FinancialReportsProps> = ({
             <Sparkles className="w-4 h-4 text-emerald-400" /> Brand Performance Matrix ({cycle.toUpperCase()})
           </h3>
           <span className="text-xs text-slate-400">
-            Automated tracking by brand line (Ocean Seychelles, Souvenir Boutique)
+            Derived live from transaction line items — syncs automatically with your vendors & catalog
           </span>
         </div>
 
@@ -425,18 +456,18 @@ export const FinancialReports: React.FC<FinancialReportsProps> = ({
                     {primarySymbol} {data.gross.toFixed(2)}
                     {settings.allowPaymentInSecondary !== false && (
                       <span className="block text-[10px] text-cyan-400 font-medium">
-                        {secondarySymbol}{(data.gross / exchangeRate).toFixed(2)}
+                        {secondarySymbol}{(data.gross / fxRate).toFixed(2)}
                       </span>
                     )}
                   </div>
                 </div>
                 <div>
-                  <div className="text-[10px] text-slate-500 uppercase">VAT (15%)</div>
+                  <div className="text-[10px] text-slate-500 uppercase">VAT Collected</div>
                   <div className="text-base font-bold text-cyan-400">
                     {primarySymbol} {data.vat.toFixed(2)}
                     {settings.allowPaymentInSecondary !== false && (
                       <span className="block text-[10px] text-slate-400 font-medium">
-                        {secondarySymbol}{(data.vat / exchangeRate).toFixed(2)}
+                        {secondarySymbol}{(data.vat / fxRate).toFixed(2)}
                       </span>
                     )}
                   </div>
@@ -460,78 +491,90 @@ export const FinancialReports: React.FC<FinancialReportsProps> = ({
         </div>
       </div>
 
-      {/* Special Variant Breakdown: Ocean Seychelles T-Shirts & Luxury vs Normal Mugs */}
+      {/* Product Line & Size/Variant Breakdown (fully data-driven) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Ocean Seychelles T-Shirt Designs by Target / Size */}
+        {/* Product Line Performance */}
         <div className="bg-[#161B22] border border-[#1E293B] rounded-xl p-5 shadow-sm space-y-3">
           <div className="flex items-center justify-between border-b border-[#1E293B] pb-2">
             <h3 className="font-bold text-sm text-[#E2E8F0] flex items-center gap-2">
-              <Shirt className="w-4 h-4 text-emerald-400" /> Ocean Seychelles T-Shirts Variant Matrix
+              <Shirt className="w-4 h-4 text-emerald-400" /> Product Line Performance
             </h3>
-            <span className="text-[10px] text-slate-400">9 Designs Across Targets</span>
+            <span className="text-[10px] text-slate-400">All brands · by product line</span>
           </div>
 
-          <div className="grid grid-cols-3 gap-3 text-center">
-            <div className="bg-[#0F1115] border border-[#1E293B] p-3 rounded-xl">
-              <div className="text-[10px] text-slate-400 uppercase font-semibold">Kids T-Shirts</div>
-              <div className="text-xl font-bold font-mono text-emerald-400 my-1">{kidsTshirtQty}</div>
-              <div className="text-[10px] text-slate-500">Units Sold</div>
+          {topProductLines.length === 0 ? (
+            <p className="text-xs text-slate-500 py-4 text-center">
+              No sales recorded for this cycle yet.
+            </p>
+          ) : (
+            <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+              {topProductLines.map(([lineName, stats]) => (
+                <div
+                  key={lineName}
+                  className="bg-[#0F1115] border border-[#1E293B] p-3 rounded-xl flex items-center justify-between gap-3"
+                >
+                  <div className="min-w-0">
+                    <div className="text-xs font-bold text-[#E2E8F0] truncate">{lineName}</div>
+                    <div className="text-[10px] text-slate-500 font-mono mt-0.5">
+                      {stats.units} units · avg {primarySymbol}{' '}
+                      {(stats.units > 0 ? stats.revenue / stats.units : 0).toFixed(2)}/ea
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <div className="text-sm font-bold font-mono text-emerald-400">
+                      {primarySymbol} {stats.revenue.toFixed(2)}
+                    </div>
+                    {settings.allowPaymentInSecondary !== false && (
+                      <div className="text-[10px] font-mono text-cyan-400">
+                        {secondarySymbol}
+                        {(stats.revenue / fxRate).toFixed(2)} {secondaryCode}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
-
-            <div className="bg-[#0F1115] border border-[#1E293B] p-3 rounded-xl">
-              <div className="text-[10px] text-slate-400 uppercase font-semibold">Women T-Shirts</div>
-              <div className="text-xl font-bold font-mono text-emerald-400 my-1">{womenTshirtQty}</div>
-              <div className="text-[10px] text-slate-500">Units Sold</div>
-            </div>
-
-            <div className="bg-[#0F1115] border border-[#1E293B] p-3 rounded-xl">
-              <div className="text-[10px] text-slate-400 uppercase font-semibold">Adults T-Shirts</div>
-              <div className="text-xl font-bold font-mono text-emerald-400 my-1">{adultsTshirtQty}</div>
-              <div className="text-[10px] text-slate-500">Units Sold</div>
-            </div>
-          </div>
+          )}
         </div>
 
-        {/* Ocean Seychelles Mug Line Comparison (Luxury vs Normal) */}
+        {/* Category & Size Variant Matrix */}
         <div className="bg-[#161B22] border border-[#1E293B] rounded-xl p-5 shadow-sm space-y-3">
           <div className="flex items-center justify-between border-b border-[#1E293B] pb-2">
             <h3 className="font-bold text-sm text-[#E2E8F0] flex items-center gap-2">
-              <Coffee className="w-4 h-4 text-cyan-400" /> Ocean Seychelles Ceramic Mug Line Comparison
+              <Coffee className="w-4 h-4 text-cyan-400" /> Category & Size Variant Matrix
             </h3>
-            <span className="text-[10px] text-slate-400">Luxury Line vs Normal Line</span>
+            <span className="text-[10px] text-slate-400">Top sellers this cycle</span>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="bg-[#0F1115] border border-amber-500/30 p-3 rounded-xl text-left">
-              <span className="bg-amber-500/20 text-amber-300 text-[10px] font-bold px-2 py-0.5 rounded border border-amber-500/30">
-                Luxury Gold Rim Line
-              </span>
-              <div className="text-xl font-bold font-mono text-emerald-400 mt-2">
-                {primarySymbol} {luxuryMugRevenue.toFixed(2)}
-              </div>
-              {settings.allowPaymentInSecondary !== false && (
-                <div className="text-[10px] font-mono font-bold text-cyan-400">
-                  {secondarySymbol}{(luxuryMugRevenue / exchangeRate).toFixed(2)} {secondaryCode}
+          {topSizeBuckets.length === 0 ? (
+            <p className="text-xs text-slate-500 py-4 text-center">
+              No sales recorded for this cycle yet.
+            </p>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              {topSizeBuckets.map(([key, stats]) => (
+                <div key={key} className="bg-[#0F1115] border border-[#1E293B] p-3 rounded-xl">
+                  <div className="text-[10px] text-slate-400 uppercase font-semibold truncate">
+                    {stats.category}
+                  </div>
+                  <div className="text-xs font-bold text-[#E2E8F0] truncate">{stats.size}</div>
+                  <div className="text-lg font-bold font-mono text-emerald-400 mt-1">
+                    {primarySymbol} {stats.revenue.toFixed(2)}
+                  </div>
+                  {settings.allowPaymentInSecondary !== false && (
+                    <div className="text-[10px] font-mono font-bold text-cyan-400">
+                      {secondarySymbol}
+                      {(stats.revenue / fxRate).toFixed(2)} {secondaryCode}
+                    </div>
+                  )}
+                  <div className="text-[11px] text-slate-400 font-mono mt-0.5">
+                    {stats.units} sold · avg {primarySymbol}{' '}
+                    {(stats.units > 0 ? stats.revenue / stats.units : 0).toFixed(2)}/ea
+                  </div>
                 </div>
-              )}
-              <div className="text-[11px] text-slate-400 font-mono mt-0.5">{luxuryMugUnits} mugs sold ({primarySymbol} 18.00/ea)</div>
+              ))}
             </div>
-
-            <div className="bg-[#0F1115] border border-blue-500/30 p-3 rounded-xl text-left">
-              <span className="bg-blue-500/20 text-blue-300 text-[10px] font-bold px-2 py-0.5 rounded border border-blue-500/30">
-                Normal Standard Line
-              </span>
-              <div className="text-xl font-bold font-mono text-emerald-400 mt-2">
-                {primarySymbol} {normalMugRevenue.toFixed(2)}
-              </div>
-              {settings.allowPaymentInSecondary !== false && (
-                <div className="text-[10px] font-mono font-bold text-cyan-400">
-                  {secondarySymbol}{(normalMugRevenue / exchangeRate).toFixed(2)} {secondaryCode}
-                </div>
-              )}
-              <div className="text-[11px] text-slate-400 font-mono mt-0.5">{normalMugUnits} mugs sold ({primarySymbol} 12.00/ea)</div>
-            </div>
-          </div>
+          )}
         </div>
       </div>
 
@@ -553,21 +596,21 @@ export const FinancialReports: React.FC<FinancialReportsProps> = ({
               <span>Gross Retail Sales:</span>
               <span className="font-bold text-[#E2E8F0]">
                 {primarySymbol} {wholesaleGrossSales.toFixed(2)}
-                {settings.allowPaymentInSecondary !== false && ` (${secondarySymbol}${(wholesaleGrossSales / exchangeRate).toFixed(2)} ${secondaryCode})`}
+                {settings.allowPaymentInSecondary !== false && ` (${secondarySymbol}${(wholesaleGrossSales / fxRate).toFixed(2)} ${secondaryCode})`}
               </span>
             </div>
             <div className="flex justify-between text-slate-400">
               <span>Less: Wholesale Cost of Goods (COGS):</span>
               <span className="text-rose-400">
                 -{primarySymbol} {wholesaleCostOfGoods.toFixed(2)}
-                {settings.allowPaymentInSecondary !== false && ` (-${secondarySymbol}${(wholesaleCostOfGoods / exchangeRate).toFixed(2)} ${secondaryCode})`}
+                {settings.allowPaymentInSecondary !== false && ` (-${secondarySymbol}${(wholesaleCostOfGoods / fxRate).toFixed(2)} ${secondaryCode})`}
               </span>
             </div>
             <div className="flex justify-between font-bold text-sm text-emerald-400 pt-2 border-t border-[#1E293B]">
               <span>NET WHOLESALE PROFIT:</span>
               <span>
                 {primarySymbol} {wholesaleNetProfit.toFixed(2)}
-                {settings.allowPaymentInSecondary !== false && ` (${secondarySymbol}${(wholesaleNetProfit / exchangeRate).toFixed(2)} ${secondaryCode})`}
+                {settings.allowPaymentInSecondary !== false && ` (${secondarySymbol}${(wholesaleNetProfit / fxRate).toFixed(2)} ${secondaryCode})`}
               </span>
             </div>
           </div>
@@ -589,21 +632,21 @@ export const FinancialReports: React.FC<FinancialReportsProps> = ({
               <span>Gross Consignment Sales:</span>
               <span className="font-bold text-[#E2E8F0]">
                 {primarySymbol} {consignmentGrossSales.toFixed(2)}
-                {settings.allowPaymentInSecondary !== false && ` (${secondarySymbol}${(consignmentGrossSales / exchangeRate).toFixed(2)} ${secondaryCode})`}
+                {settings.allowPaymentInSecondary !== false && ` (${secondarySymbol}${(consignmentGrossSales / fxRate).toFixed(2)} ${secondaryCode})`}
               </span>
             </div>
             <div className="flex justify-between text-slate-400">
               <span>Less: Owed to Depositors (Artisans):</span>
               <span className="text-amber-400">
                 -{primarySymbol} {consignmentVendorPayouts.toFixed(2)}
-                {settings.allowPaymentInSecondary !== false && ` (-${secondarySymbol}${(consignmentVendorPayouts / exchangeRate).toFixed(2)} ${secondaryCode})`}
+                {settings.allowPaymentInSecondary !== false && ` (-${secondarySymbol}${(consignmentVendorPayouts / fxRate).toFixed(2)} ${secondaryCode})`}
               </span>
             </div>
             <div className="flex justify-between font-bold text-sm text-emerald-400 pt-2 border-t border-[#1E293B]">
               <span>HOUSE COMMISSION RETAINED:</span>
               <span>
                 {primarySymbol} {consignmentHouseCommissions.toFixed(2)}
-                {settings.allowPaymentInSecondary !== false && ` (${secondarySymbol}${(consignmentHouseCommissions / exchangeRate).toFixed(2)} ${secondaryCode})`}
+                {settings.allowPaymentInSecondary !== false && ` (${secondarySymbol}${(consignmentHouseCommissions / fxRate).toFixed(2)} ${secondaryCode})`}
               </span>
             </div>
           </div>
@@ -628,7 +671,7 @@ export const FinancialReports: React.FC<FinancialReportsProps> = ({
               </div>
               {settings.allowPaymentInSecondary !== false && (
                 <div className="text-[10px] font-mono text-cyan-400 font-bold block mt-0.5">
-                  {secondarySymbol}{(stats.revenue / exchangeRate).toFixed(2)} {secondaryCode}
+                  {secondarySymbol}{(stats.revenue / fxRate).toFixed(2)} {secondaryCode}
                 </div>
               )}
               <div className="text-[10px] text-slate-500">{stats.units} items sold</div>

@@ -893,7 +893,7 @@ class PosDatabase {
         this.inventory[idx] = {
           ...this.inventory[idx],
           ...itemData,
-          brand: itemData.brand || vendor?.brandName || 'Ocean Seychelles',
+          brand: itemData.brand || vendor?.brandName || 'Unbranded',
           costBasis: calculatedCostBasis,
           vatRate,
         };
@@ -905,7 +905,7 @@ class PosDatabase {
     const newItem: InventoryItem = {
       ...itemData,
       id: this.generateId('ITEM'),
-      brand: itemData.brand || vendor?.brandName || 'Ocean Seychelles',
+      brand: itemData.brand || vendor?.brandName || 'Unbranded',
       costBasis: calculatedCostBasis,
       vatRate,
       createdAt: new Date().toISOString(),
@@ -1072,7 +1072,7 @@ class PosDatabase {
       return {
         itemId: item.id,
         name: item.name,
-        brand: item.brand || vendor?.brandName || 'Ocean Seychelles',
+        brand: item.brand || vendor?.brandName || 'Unbranded',
         category: item.category,
         productLine: item.productLine,
         size: item.size,
@@ -1415,7 +1415,7 @@ class PosDatabase {
       return {
         itemId: item.id,
         name: item.name,
-        brand: item.brand || vendor?.brandName || 'Ocean Seychelles',
+        brand: item.brand || vendor?.brandName || 'Unbranded',
         category: item.category,
         productLine: item.productLine,
         size: item.size,

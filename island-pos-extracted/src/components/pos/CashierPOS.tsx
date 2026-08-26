@@ -199,7 +199,7 @@ export const CashierPOS: React.FC<CashierPOSProps> = ({
 
   const brands = [
     'All',
-    ...Array.from(new Set(inventory.map((i) => i.brand || 'Ocean Seychelles'))),
+    ...Array.from(new Set(inventory.map((i) => i.brand || 'Unbranded'))),
   ];
 
   const vatRate = posDb.getVatRate();
@@ -211,7 +211,7 @@ export const CashierPOS: React.FC<CashierPOSProps> = ({
 
   // Filtered inventory items (real-time filtering across name, SKU, size, variant, brand, category)
   const filteredInventory = inventory.filter((item) => {
-    const itemBrand = item.brand || 'Ocean Seychelles';
+    const itemBrand = item.brand || 'Unbranded';
     const matchesBrand = selectedBrand === 'All' || itemBrand === selectedBrand;
     const matchesCategory = selectedCategory === 'All' || item.category === selectedCategory;
     

@@ -9,6 +9,9 @@ export const EODBalancing: React.FC = () => {
   const allSessions = posDb.getEODSessions();
   const activeSession = posDb.getActiveEODSession();
 
+  const settings = posDb.getSettings();
+  const primarySymbol = settings.primaryCurrencySymbol || 'SR';
+
   // Cash Drawer History Filters
   const [logFilter, setLogFilter] = useState<'all' | 'shift' | 'adjustments' | 'drops' | 'manual'>('all');
   const [logSearchQuery, setLogSearchQuery] = useState('');
@@ -45,7 +48,7 @@ export const EODBalancing: React.FC = () => {
 
   // Export CSV of Drawer Logs
   const handleExportCsv = () => {
-    const headers = ['ID', 'Timestamp', 'Event Type', 'Staff Member', 'Amount ($)', 'Drawer Float After ($)', 'Reason / Notes'];
+    const headers = ['ID', 'Timestamp', 'Event Type', 'Staff Member', `Amount (${primarySymbol})`, `Drawer Float After (${primarySymbol})`, 'Reason / Notes'];
     const rows = filteredLogs.map((l) => [
       l.id,
       new Date(l.timestamp).toLocaleString(),
@@ -296,14 +299,14 @@ export const EODBalancing: React.FC = () => {
                         }`}
                       >
                         {log.eventType === 'manual_open'
-                          ? '$0.00'
+                          ? `${primarySymbol} 0.00`
                           : log.amount !== undefined
-                          ? `${isPositive ? '+' : isNegative ? '-' : ''}$${log.amount.toFixed(2)}`
+                          ? `${isPositive ? '+' : isNegative ? '-' : ''}${primarySymbol}${log.amount.toFixed(2)}`
                           : '—'}
                       </td>
                       <td className="p-3 text-right font-mono font-medium text-slate-300 whitespace-nowrap">
                         {log.currentFloatAfter !== undefined
-                          ? `$${log.currentFloatAfter.toFixed(2)}`
+                          ? `${primarySymbol}${log.currentFloatAfter.toFixed(2)}`
                           : '—'}
                       </td>
                       <td className="p-3 text-slate-300 max-w-xs truncate" title={log.reason}>
@@ -348,20 +351,20 @@ export const EODBalancing: React.FC = () => {
                     <td className="p-3 text-slate-400">
                       {new Date(s.openedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </td>
-                    <td className="p-3 text-right font-mono">${s.startingFloat.toFixed(2)}</td>
+                    <td className="p-3 text-right font-mono">{primarySymbol} {s.startingFloat.toFixed(2)}</td>
                     <td className="p-3 text-right font-mono text-emerald-400">
-                      +${s.cashSales.toFixed(2)}
+                      +{primarySymbol}{s.cashSales.toFixed(2)}
                     </td>
                     <td
                       className={`p-3 text-right font-mono ${
                         adjSum < 0 ? 'text-amber-400' : adjSum > 0 ? 'text-blue-400' : 'text-slate-500'
                       }`}
                     >
-                      {adjSum === 0 ? '$0.00' : `${adjSum > 0 ? '+' : ''}$${adjSum.toFixed(2)}`}
+                      {adjSum === 0 ? `${primarySymbol} 0.00` : `${adjSum > 0 ? '+' : ''}${primarySymbol}${adjSum.toFixed(2)}`}
                     </td>
-                    <td className="p-3 text-right font-mono font-bold">${s.expectedCash.toFixed(2)}</td>
+                    <td className="p-3 text-right font-mono font-bold">{primarySymbol} {s.expectedCash.toFixed(2)}</td>
                     <td className="p-3 text-right font-mono">
-                      {s.actualCash !== undefined ? `$${s.actualCash.toFixed(2)}` : '—'}
+                      {s.actualCash !== undefined ? `${primarySymbol}${s.actualCash.toFixed(2)}` : '—'}
                     </td>
                     <td
                       className={`p-3 text-right font-mono font-bold ${
@@ -373,7 +376,7 @@ export const EODBalancing: React.FC = () => {
                       }`}
                     >
                       {s.cashDifference !== undefined
-                        ? `${s.cashDifference >= 0 ? '+' : ''}$${s.cashDifference.toFixed(2)}`
+                        ? `${s.cashDifference >= 0 ? '+' : ''}${primarySymbol}${s.cashDifference.toFixed(2)}`
                         : '—'}
                     </td>
                     <td className="p-3">

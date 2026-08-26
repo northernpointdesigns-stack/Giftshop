@@ -22,8 +22,13 @@ export const TRIAL_DAYS = 14;
  */
 function readLicenseDisabledFlag(): boolean {
   try {
-    const env = (import.meta as { env?: Record<string, string | undefined> } | undefined)?.env;
-    const flag = env?.VITE_DISABLE_LICENSE;
+    // IMPORTANT: access `import.meta.env.VITE_DISABLE_LICENSE` directly — no
+    // optional chaining and no type casts. Vite only statically replaces the
+    // exact member expression `import.meta.env.VITE_*` at build time; indirect
+    // access (e.g. `import.meta?.env?.VITE_X`) survives into the production
+    // bundle where `import.meta.env` is undefined, silently forcing trial
+    // mode on regardless of the build environment.
+    const flag = import.meta.env.VITE_DISABLE_LICENSE;
     return flag === '1' || flag === 'true';
   } catch {
     return false;

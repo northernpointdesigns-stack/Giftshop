@@ -3032,7 +3032,7 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
                         </div>
                         <div className="text-[9px] text-slate-500 flex justify-between">
                           <span>1 x $28.00</span>
-                          <span>VAT 15%: $3.65</span>
+                          <span>VAT {(settings.defaultVatRate * 100).toFixed(0)}%: ${(28 * settings.defaultVatRate).toFixed(2)}</span>
                         </div>
                       </div>
                       <div>
@@ -3042,7 +3042,7 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
                         </div>
                         <div className="text-[9px] text-slate-500 flex justify-between">
                           <span>1 x $16.00</span>
-                          <span>VAT 15%: $2.09</span>
+                          <span>VAT {(settings.defaultVatRate * 100).toFixed(0)}%: ${(16 * settings.defaultVatRate).toFixed(2)}</span>
                         </div>
                       </div>
                     </div>

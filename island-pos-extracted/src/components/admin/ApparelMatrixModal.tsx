@@ -61,8 +61,8 @@ export const ApparelMatrixModal: React.FC<ApparelMatrixModalProps> = ({
   onOpenPrinterForItems,
 }) => {
   // Base parent info
-  const [productName, setProductName] = useState(initialProduct?.name || 'Ocean Seychelles T-Shirt - Coconut Tree');
-  const [brand, setBrand] = useState(initialProduct?.brand || 'Ocean Seychelles');
+  const [productName, setProductName] = useState(initialProduct?.name || '');
+  const [brand, setBrand] = useState(initialProduct?.brand || 'Unbranded');
   const [category, setCategory] = useState(initialProduct?.category || 'T-Shirts');
   const [productLine, setProductLine] = useState(initialProduct?.productLine || 'Beach Heritage');
   const [vendorId, setVendorId] = useState(initialProduct?.vendorId || vendors[0]?.id || '');

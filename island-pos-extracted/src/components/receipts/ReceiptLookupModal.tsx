@@ -377,7 +377,16 @@ Items: ${selectedTx.items.map((i) => `${i.quantity}x ${i.name} [${primarySymbol}
                         </span>
                       </div>
                       <p className="text-[11px] text-slate-400 mt-0.5">
-                        Statutory VAT rate of 15% and all domestic tax audits are computed in <strong>{primaryCode}</strong>.
+                        Effective VAT rate of{' '}
+                        {selectedTx
+                          ? (() => {
+                              const base = Math.max((selectedTx.subtotal || 0) - (selectedTx.discount || 0), 0);
+                              return base > 0
+                                ? (((selectedTx.vatTotal || selectedTx.tax || 0) / base) * 100).toFixed(1)
+                                : '15.0';
+                            })()
+                          : '15.0'}
+                        % and all domestic tax audits are computed in <strong>{primaryCode}</strong>.
                         {auditReport.isSecondarySettlement && (
                           <span className="text-amber-300 ml-1">
                             (Settled in {secondaryCode} at locked rate of 1 {secondaryCode} = {primarySymbol} {auditReport.appliedExchangeRate?.toFixed(2)}).

@@ -64,7 +64,7 @@ export const SalesForecasting: React.FC<SalesForecastingProps> = ({
   }, [inventory]);
 
   const brands = useMemo(() => {
-    const list = new Set(inventory.map((item) => item.brand || 'Ocean Seychelles'));
+    const list = new Set(inventory.map((item) => item.brand || 'Unbranded'));
     return Array.from(list);
   }, [inventory]);
 
@@ -294,10 +294,11 @@ export const SalesForecasting: React.FC<SalesForecastingProps> = ({
     csvContent += 'SKU,Item Name,Category,Brand,Current Stock,Min Threshold,Days Remaining,Historical Units Sold,Daily Velocity,Projected 30D Demand,Safety Buffer %,Safety Stock Target,Suggested Re-order Qty,Unit Cost Basis,Total Re-order Cost,Supplier Type,Vendor\n';
 
     forecastedItems.forEach((item) => {
-      const vendorName = vendors.find((v) => v.id === item.vendorId)?.name || 'Unknown';
-      const supplierType = item.retailPrice === item.costBasis ? 'Consignment' : 'Wholesale';
+      const vendor = vendors.find((v) => v.id === item.vendorId);
+      const vendorName = vendor?.name || 'Unknown';
+      const supplierType = vendor?.supplierType === 'consignment' ? 'Consignment' : 'Wholesale';
       const cleanName = item.name.replace(/,/g, ' ');
-      const cleanBrand = (item.brand || 'Seychelles').replace(/,/g, ' ');
+      const cleanBrand = (item.brand || 'Unbranded').replace(/,/g, ' ');
       const cleanCategory = item.category.replace(/,/g, ' ');
 
       csvContent += `${item.sku},"${cleanName}","${cleanCategory}","${cleanBrand}",${item.stockLevel},${item.minStockThreshold},${item.daysRemaining === 999 ? '30+' : item.daysRemaining},${item.unitsSold},${item.dailyVelocity.toFixed(3)},${item.forecasted30DayDemand.toFixed(1)},${(safetyBuffer * 100).toFixed(0)}%,${item.targetStockLevel},${item.suggestedOrder},${item.costBasis.toFixed(2)},${item.totalCostBasis.toFixed(2)},${supplierType},"${vendorName}"\n`;
@@ -642,7 +643,7 @@ export const SalesForecasting: React.FC<SalesForecastingProps> = ({
                         <div className="flex items-center gap-2 mt-0.5 text-[10px] text-slate-400 font-mono">
                           <span>SKU: {item.sku}</span>
                           <span>•</span>
-                          <span className="text-slate-300">{item.brand || 'Ocean Seychelles'}</span>
+                          <span className="text-slate-300">{item.brand || 'Unbranded'}</span>
                           <span>•</span>
                           <span className="text-slate-500 font-sans">{item.category}</span>
                         </div>

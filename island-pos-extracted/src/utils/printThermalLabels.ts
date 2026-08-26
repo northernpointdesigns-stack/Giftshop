@@ -83,7 +83,7 @@ export const printThermalLabels = (
 
     return Array.from({ length: count }).map(() => `
       <div class="label-container">
-        ${showBrand ? `<div class="brand">${item.brand || 'Ocean Seychelles'}</div>` : ''}
+        ${showBrand ? `<div class="brand">${item.brand || 'Unbranded'}</div>` : ''}
         <div class="product-name">${item.name}</div>
         <div class="meta-row">
           ${showCategory ? `<span>${item.category}</span>` : ''}

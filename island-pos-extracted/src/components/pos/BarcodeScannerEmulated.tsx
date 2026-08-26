@@ -238,7 +238,7 @@ export const BarcodeScannerEmulated: React.FC<BarcodeScannerEmulatedProps> = ({
                   </span>
                 )}
                 <span className="font-bold text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.2 rounded text-[10px]">
-                  {lastScannedItem.brand || 'Ocean Seychelles'}
+                  {lastScannedItem.brand || 'Unbranded'}
                 </span>
                 <span className="font-bold text-[#E2E8F0]">{lastScannedItem.name}</span>
               </div>

@@ -201,7 +201,7 @@ export const InventoryAdmin: React.FC<InventoryAdminProps> = ({
   // Form State
   const [formData, setFormData] = useState({
     name: '',
-    brand: 'Ocean Seychelles',
+    brand: 'Unbranded',
     category: 'T-Shirts',
     productLine: 'Beach Heritage',
     size: 'Adults - Medium',
@@ -255,7 +255,7 @@ export const InventoryAdmin: React.FC<InventoryAdminProps> = ({
   const categories: string[] = ['All', ...Array.from(new Set(inventory.map((i) => i.category))) as string[]];
   const brands: string[] = [
     'All',
-    ...(Array.from(new Set(inventory.map((i) => i.brand || 'Ocean Seychelles'))) as string[]),
+    ...(Array.from(new Set(inventory.map((i) => i.brand || 'Unbranded'))) as string[]),
   ];
 
   const handleSelectCategoryPreset = (categoryName: string) => {
@@ -454,7 +454,7 @@ export const InventoryAdmin: React.FC<InventoryAdminProps> = ({
 
     const newFormData = {
       name: '',
-      brand: 'Ocean Seychelles',
+      brand: 'Unbranded',
       category: cat,
       productLine: initialProductLine,
       size: initialSize,
@@ -512,7 +512,7 @@ export const InventoryAdmin: React.FC<InventoryAdminProps> = ({
 
     setFormData({
       name: item.name,
-      brand: item.brand || 'Ocean Seychelles',
+      brand: item.brand || 'Unbranded',
       category: item.category,
       productLine: item.productLine || 'Normal Line',
       size: item.size || 'One Size',
@@ -709,7 +709,7 @@ export const InventoryAdmin: React.FC<InventoryAdminProps> = ({
       }))
       .filter(({ item, score }) => {
         const matchesCategory = selectedCategory === 'All' || item.category === selectedCategory;
-        const matchesBrand = selectedBrandFilter === 'All' || (item.brand || 'Ocean Seychelles') === selectedBrandFilter;
+        const matchesBrand = selectedBrandFilter === 'All' || (item.brand || 'Unbranded') === selectedBrandFilter;
         const matchesVendor = selectedVendorFilter === 'All' || item.vendorId === selectedVendorFilter;
         const matchesLowStock = !onlyLowStockFilter || item.stockLevel <= item.minStockThreshold;
         return score > 0 && matchesCategory && matchesBrand && matchesVendor && matchesLowStock;
@@ -753,7 +753,7 @@ export const InventoryAdmin: React.FC<InventoryAdminProps> = ({
     const groups = new Map<string, InventoryItem[]>();
     filteredInventory.forEach((item) => {
       const displayName = resolveItemDisplayName(item);
-      const key = `${item.brand || 'Ocean Seychelles'}|${item.category}|${displayName}`;
+      const key = `${item.brand || 'Unbranded'}|${item.category}|${displayName}`;
       if (!groups.has(key)) {
         groups.set(key, []);
       }
@@ -773,7 +773,7 @@ export const InventoryAdmin: React.FC<InventoryAdminProps> = ({
 
         return {
           id: key,
-          brand: items[0].brand || 'Ocean Seychelles',
+          brand: items[0].brand || 'Unbranded',
           category: items[0].category,
           name: resolvedName,
           productLine: items[0].productLine || 'Standard Line',
@@ -822,7 +822,7 @@ export const InventoryAdmin: React.FC<InventoryAdminProps> = ({
             <Package className="w-5 h-5 text-emerald-400" /> Catalog & Inventory Manager
           </h2>
           <p className="text-xs text-slate-400 mt-0.5">
-            Manage Ocean Seychelles, Souvenir Boutique stock, apparel size matrices, and GS1 GTIN barcode labeling
+            Manage vendor brand stock, apparel size matrices, and GS1 GTIN barcode labeling
           </p>
         </div>
 
@@ -979,7 +979,7 @@ export const InventoryAdmin: React.FC<InventoryAdminProps> = ({
                     const resolvedName = resolveItemDisplayName(item);
                     setSearchQuery(resolvedName);
                     setIsSearchFocused(false);
-                    const key = `${item.brand || 'Ocean Seychelles'}|${item.category}|${resolvedName}`;
+                    const key = `${item.brand || 'Unbranded'}|${item.category}|${resolvedName}`;
                     setExpandedGroups((prev) => ({ ...prev, [key]: true }));
                   }}
                   className="p-2.5 hover:bg-slate-800/60 cursor-pointer transition-colors flex items-center justify-between gap-3 text-xs"
@@ -1000,7 +1000,7 @@ export const InventoryAdmin: React.FC<InventoryAdminProps> = ({
                     </div>
                     <div className="text-[10px] font-mono text-slate-400 mt-0.5 flex items-center gap-2">
                       <span>SKU: <HighlightText text={item.sku} highlight={searchQuery} /></span>
-                      <span>• {item.brand || 'Ocean Seychelles'}</span>
+                      <span>• {item.brand || 'Unbranded'}</span>
                     </div>
                   </div>
 
@@ -1574,7 +1574,7 @@ export const InventoryAdmin: React.FC<InventoryAdminProps> = ({
                         <td className="p-3">
                           <div className="font-bold text-[#E2E8F0] flex items-center gap-1.5">
                             <span className="text-[10px] bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 px-1.5 py-0.2 rounded font-bold">
-                              {item.brand || 'Ocean Seychelles'}
+                              {item.brand || 'Unbranded'}
                             </span>
                             <HighlightText text={resolveItemDisplayName(item)} highlight={searchQuery} />
                           </div>

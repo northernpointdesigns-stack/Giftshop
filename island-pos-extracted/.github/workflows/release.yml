@@ -34,6 +34,16 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v4
 
+      - name: Configure license mode
+        shell: bash
+        run: |
+          echo "VITE_DISABLE_LICENSE=$VITE_DISABLE_LICENSE" >> .env.production
+          if [ "$VITE_DISABLE_LICENSE" = "1" ]; then
+            echo "UNLOCKED owner build - trial/activation gate disabled"
+          else
+            echo "Customer build - 14-day trial gate enabled"
+          fi
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -74,6 +84,16 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v4
 
+      - name: Configure license mode
+        shell: bash
+        run: |
+          echo "VITE_DISABLE_LICENSE=$VITE_DISABLE_LICENSE" >> .env.production
+          if [ "$VITE_DISABLE_LICENSE" = "1" ]; then
+            echo "UNLOCKED owner build - trial/activation gate disabled"
+          else
+            echo "Customer build - 14-day trial gate enabled"
+          fi
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -105,6 +125,16 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v4
+
+      - name: Configure license mode
+        shell: bash
+        run: |
+          echo "VITE_DISABLE_LICENSE=$VITE_DISABLE_LICENSE" >> .env.production
+          if [ "$VITE_DISABLE_LICENSE" = "1" ]; then
+            echo "UNLOCKED owner build - trial/activation gate disabled"
+          else
+            echo "Customer build - 14-day trial gate enabled"
+          fi
 
       - name: Set up Node.js
         uses: actions/setup-node@v4

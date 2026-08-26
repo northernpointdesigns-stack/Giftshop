@@ -577,7 +577,7 @@ const GS1BarcodeSticker: React.FC<GS1BarcodeStickerProps> = ({
       <div>
         {showBrand && (
           <div className="font-extrabold text-[9px] uppercase tracking-wider text-slate-700 truncate">
-            {item.brand || 'Ocean Seychelles'}
+            {item.brand || 'Unbranded'}
           </div>
         )}
         <div className="font-bold text-[10px] sm:text-[11px] truncate uppercase leading-tight text-slate-900">
