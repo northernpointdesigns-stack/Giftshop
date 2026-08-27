@@ -47,7 +47,7 @@ export const LicenseGate: React.FC<LicenseGateProps> = ({ onActivated }) => {
           </div>
           <h1 className="text-lg font-black text-[#E2E8F0] tracking-tight">Activate Your License</h1>
           <p className="text-xs text-slate-400 mt-1">
-            Your {TRIAL_DAYS}-day free trial has ended. Enter the license key from your purchase email to keep selling.
+            Your {TRIAL_DAYS}-day free trial has ended. Enter the license key and the email you used at checkout to keep selling.
           </p>
         </div>
 
@@ -94,7 +94,7 @@ export const LicenseGate: React.FC<LicenseGateProps> = ({ onActivated }) => {
               'Verifying…'
             ) : (
               <>
-                <ShieldCheck className="w-4 h-4" /> Activate Offline
+                <ShieldCheck className="w-4 h-4" /> Activate License
               </>
             )}
           </button>
@@ -116,7 +116,7 @@ export const LicenseGate: React.FC<LicenseGateProps> = ({ onActivated }) => {
         </div>
 
         <p className="text-center text-[9px] text-slate-700 leading-relaxed">
-          Activation is verified locally — your POS keeps working fully offline after setup.
+          Your license is verified with LemonSqueezy once (online), then cached locally -- your POS keeps working offline after activation.
         </p>
       </div>
     </div>

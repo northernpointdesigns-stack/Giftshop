@@ -35,9 +35,38 @@ function readLicenseDisabledFlag(): boolean {
   }
 }
 export const LICENSE_DISABLED = readLicenseDisabledFlag();
-/** Where customers buy — point this at your Gumroad / Lemon Squeezy / Paddle page */
-export const PURCHASE_URL = 'https://your-store.example.com/buy';
+
+/**
+ * Where customers buy (a plain link on the activation screen). Point this at
+ * your hosted storefront — e.g. your LemonSqueezy checkout URL:
+ *   VITE_PURCHASE_URL=https://your-store.lemonsqueezy.com/buy/lifetime
+ * Falls back to the placeholder below when unset.
+ */
+function readPurchaseUrl(): string {
+  try {
+    // Vite statically replaces the exact member expression `import.meta.env.VITE_*`
+    // at build time. In plain Node/tsx (scripts/test-license.ts) import.meta.env is
+    // undefined, so the access throws and we fall through to the default.
+    const v = import.meta.env.VITE_PURCHASE_URL;
+    if (v) return String(v);
+  } catch {}
+  return 'https://your-store.example.com/buy';
+}
+export const PURCHASE_URL = readPurchaseUrl();
 export const SUPPORT_EMAIL = 'support@your-store.example.com';
+
+/**
+ * LemonSqueezy License API — customer-facing, requires NO store secret.
+ * Docs (status enum: inactive | active | expired | disabled; 60 req/min):
+ *   https://docs.lemonsqueezy.com/api/license-api
+ *
+ * We activate against the buyer's email + the key LS generated at checkout.
+ * A successful call means the key is `active` for that email; the license is
+ * then cached locally so the POS keeps running offline afterwards.
+ * (Confirmed against the live endpoint: it expects form fields
+ *  `license_key`, `email`, and `instance_name`.)
+ */
+export const LEMON_SQUEEZY_LICENSE_API = 'https://api.lemonsqueezy.com/v1/licenses/activate';
 
 export interface StoredLicense {
   key: string;
@@ -114,7 +143,125 @@ export async function generateLicenseKey(email: string): Promise<string> {
 export async function verifyLicense(email: string, key: string): Promise<boolean> {
   if (!email.trim() || !key.trim()) return false;
   const expected = normalizeKey(await generateLicenseKey(email));
-  return normalizeKey(key) === expected;
+    return normalizeKey(key) === expected;
+}
+
+/* ------------------------------------------------------------------ */
+/* LemonSqueezy online activation                                      */
+/* ------------------------------------------------------------------ */
+
+const DEVICE_ID_KEY = 'pos_license_device_id';
+
+/** Stable per-machine instance name so LS reuses (not duplicates) the
+ * activation slot across re-activations on the same device. */
+function getDeviceInstanceName(): string {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const existing = localStorage.getItem(DEVICE_ID_KEY);
+      if (existing) return existing;
+      const id = 'IslandPOS-' + Math.random().toString(36).slice(2, 12).toUpperCase();
+      localStorage.setItem(DEVICE_ID_KEY, id);
+      return id;
+    }
+  } catch {}
+  const suffix = (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
+    ? crypto.randomUUID().slice(0, 8).toUpperCase()
+    : Math.random().toString(36).slice(2, 12).toUpperCase();
+  return `IslandPOS-${suffix}`;
+}
+
+interface OnlineVerifyResult {
+  ok: boolean;
+  error?: string;
+  /** true when LS was unreachable / undecodable — caller may fall back to offline HMAC */
+  unavailable?: boolean;
+}
+
+/**
+ * Validate (and activate) a LemonSqueezy license key for the given email
+ * via LS's public License API. No store secret required.
+ *
+ * Returns:
+ *   { ok: true }                       key is active for this email
+ *   { ok: false, unavailable: true }   LS unreachable  -> retryable / fall back
+ *   { ok: false, unavailable: false }  LS reachable but key invalid/expired/disabled
+ */
+export async function verifyLicenseOnline(
+  email: string,
+  key: string,
+  signal?: AbortSignal,
+): Promise<OnlineVerifyResult> {
+  const form = new URLSearchParams({
+    license_key: key,
+    email: email,
+    instance_name: getDeviceInstanceName(),
+  });
+
+  let resp: Response;
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10_000);
+    try {
+      resp = await fetch(LEMON_SQUEEZY_LICENSE_API, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: form,
+        signal: signal ?? controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+  } catch (e: any) {
+    const name = e?.name;
+    if (name === 'AbortError' && signal?.aborted) {
+      return { ok: false, unavailable: false, error: 'Verification cancelled.' };
+    }
+    return {
+      ok: false,
+      unavailable: true,
+      error: 'Could not reach LemonSqueezy. If you just purchased, try again in a moment, or check your network.',
+    };
+  }
+
+  if (!resp.ok) {
+    let detail: string | undefined;
+    try {
+      const body = await resp.json();
+      detail = typeof body?.message === 'string'
+        ? body.message
+        : body?.error
+          ? String(body.error)
+          : `LemonSqueezy validation failed (HTTP ${resp.status}).`;
+    } catch {
+      detail = `LemonSqueezy responded with HTTP ${resp.status}.`;
+    }
+    return { ok: false, unavailable: false, error: detail };
+  }
+
+  let json: any;
+  try {
+    json = await resp.json();
+  } catch {
+    return { ok: false, unavailable: true, error: 'Could not read LemonSqueezy response.' };
+  }
+
+  // LS responds either with { valid: true } or a JSON:API-style { license_key: { attributes: { status } } }.
+  const active =
+    json?.valid === true ||
+    json?.license_key?.attributes?.status === 'active' ||
+    json?.data?.attributes?.status === 'active';
+  if (active) return { ok: true };
+
+  const status = json?.license_key?.attributes?.status ?? json?.status;
+  const message = typeof json?.message === 'string'
+    ? json.message
+    : status
+      ? `License key state: ${status}.`
+      : 'LemonSqueezy could not verify this license key.';
+  return { ok: false, unavailable: false, error: message };
 }
 
 /* ------------------------------------------------------------------ */
@@ -185,12 +332,19 @@ export function resolveLicenseState(): LicenseState {
 
 /**
  * Attempt activation with a customer email + key.
- * Returns an ok/error result; stores the license on success.
+ *
+ * Two verification paths, both accepted on success -- the same screen serves
+ * LemonSqueezy buyers AND owner-issued HMAC keys:
+ *   1. LemonSqueezy License API (primary for DMG buyers). Needs internet once;
+ *      the license is cached locally and the POS then runs offline.
+ *   2. Offline HMAC (owner keys via scripts/generate-license.ts) and the
+ *      no-network fallback when LS cannot be reached.
  */
 export async function activateLicense(
   email: string,
-  key: string
-): Promise<{ ok: boolean; error?: string }> {
+  key: string,
+  signal?: AbortSignal,
+): Promise<{ ok: boolean; error?: string; source?: 'lemonsqueezy' | 'offline' }> {
   const trimmedEmail = email.trim();
   const trimmedKey = key.trim();
   if (!trimmedEmail || !trimmedKey) return { ok: false, error: 'Please enter both your purchase email and license key.' };
@@ -200,14 +354,26 @@ export async function activateLicense(
     return { ok: false, error: 'That key looks too short — check for missing characters.' };
   }
 
-  const valid = await verifyLicense(trimmedEmail, trimmedKey);
-  if (!valid) {
-    return {
-      ok: false,
-      error: 'This key does not match the email entered. Keys are tied to the exact purchase email address.',
-    };
+  // 1) Verify with LemonSqueezy's customer License API (the buyer path).
+  //    Activated keys are cached locally, so the POS then runs offline.
+  const online = await verifyLicenseOnline(trimmedEmail, trimmedKey, signal);
+  if (online.ok) {
+    storeLicense(trimmedEmail, trimmedKey);
+    return { ok: true, source: 'lemonsqueezy' };
   }
-  storeLicense(trimmedEmail, trimmedKey);
-  return { ok: true };
+
+  // 2) Offline HMAC fallback: owner-issued keys (scripts/generate-license.ts),
+  //    and the no-network fallback when LS cannot be reached.
+  if (await verifyLicense(trimmedEmail, trimmedKey)) {
+    storeLicense(trimmedEmail, trimmedKey);
+    return { ok: true, source: 'offline' };
+  }
+
+  // Neither succeeded: surface the online error first (most relevant for a
+  // buyer), then the offline mismatch message.
+  return {
+    ok: false,
+    error: online.error || 'This key does not match the email entered. Keys are tied to the exact purchase email address.',
+  };
 }
 
