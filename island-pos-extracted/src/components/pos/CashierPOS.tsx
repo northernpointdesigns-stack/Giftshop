@@ -44,7 +44,7 @@ import { RefundModal } from './RefundModal';
 import { CustomerLookupModal } from './CustomerLookupModal';
 import { ReceiptLookupModal } from '../receipts/ReceiptLookupModal';
 import { ManagerPinGateModal } from '../auth/ManagerPinGateModal';
-import { RegisterSnapshot, loadRegisterSnapshot, saveRegisterSnapshot } from '../../services/registerSnapshot';
+import { RegisterSnapshot, HeldCartSnapshot, loadRegisterSnapshot, saveRegisterSnapshot } from '../../services/registerSnapshot';
 
 interface CashierPOSProps {
   inventory: InventoryItem[];
@@ -166,7 +166,10 @@ export const CashierPOS: React.FC<CashierPOSProps> = ({
     initialSnapshot?.discountType ?? 'amount'
   );
   const [discountValue, setDiscountValue] = useState<number>(initialSnapshot?.discountValue ?? 0);
-  const [heldCart, setHeldCart] = useState<CartItem[] | null>(initialSnapshot?.heldCart ?? null);
+  // Parked carts: each non-empty cart can be put on hold so the cashier can
+  // serve the next customer, then recall / rename / discard it later.
+  const [heldCarts, setHeldCarts] = useState<HeldCartSnapshot[]>(initialSnapshot?.heldCarts ?? []);
+  const [isHeldListOpen, setIsHeldListOpen] = useState<boolean>(false);
 
   // Attached Customer State
   const [attachedCustomer, setAttachedCustomer] = useState<Customer | null>(
@@ -184,11 +187,11 @@ export const CashierPOS: React.FC<CashierPOSProps> = ({
       cart,
       discountType,
       discountValue,
-      heldCart,
+      heldCarts,
       attachedCustomer,
       savedAt: Date.now(),
     });
-  }, [cart, discountType, discountValue, heldCart, attachedCustomer]);
+  }, [cart, discountType, discountValue, heldCarts, attachedCustomer]);
 
   // Switching registers swaps to that register's own saved basket.
   useEffect(() => {
@@ -198,7 +201,8 @@ export const CashierPOS: React.FC<CashierPOSProps> = ({
     setCart(snap?.cart ?? []);
     setDiscountType(snap?.discountType ?? 'amount');
     setDiscountValue(snap?.discountValue ?? 0);
-    setHeldCart(snap?.heldCart ?? null);
+    setHeldCarts(snap?.heldCarts ?? []);
+    setIsHeldListOpen(false);
     setAttachedCustomer(snap?.attachedCustomer ?? null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeRegisterId]);
@@ -353,7 +357,6 @@ export const CashierPOS: React.FC<CashierPOSProps> = ({
 
   // Sync Customer Display
   useEffect(() => {
-    const lastCartLine = cart.length > 0 ? cart[cart.length - 1] : undefined;
     const currentReg = (settings.registers || []).find((r) => r.id === activeRegisterId);
     const currentPL = (settings.priceLists || []).find((l) => l.id === activePriceListId);
 
@@ -397,14 +400,6 @@ export const CashierPOS: React.FC<CashierPOSProps> = ({
       secondaryTotal,
       stationName: currentReg?.name || 'Main Station',
       priceTierName: currentPL ? `${currentPL.name}${currentPL.discountPercentage ? ` (-${currentPL.discountPercentage}%)` : ''}` : undefined,
-      lastScannedItem: lastCartLine
-        ? {
-            name: lastCartLine.item.name,
-            brand: lastCartLine.item.brand,
-            price: lastCartLine.resolvedPrice ?? lastCartLine.item.retailPrice,
-            stockRemaining: lastCartLine.item.stockLevel,
-          }
-        : undefined,
     });
   }, [
     cart,
@@ -673,18 +668,87 @@ export const CashierPOS: React.FC<CashierPOSProps> = ({
     setDiscountType('amount');
   };
 
+  // --- Held carts (multi-customer parking) ---------------------------------
+  const nextHeldLabel = (count: number) =>
+    `Customer ${'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[count % 26]}`;
+
+  const holdCartInto = (): HeldCartSnapshot => ({
+    id: `held-${Date.now()}`,
+    label: nextHeldLabel(heldCarts.length),
+    lines: cart,
+    discountType,
+    discountValue,
+    attachedCustomerId: attachedCustomer?.id ?? null,
+    attachedCustomerName: attachedCustomer?.name,
+    heldAt: Date.now(),
+  });
+
+  /** Park the current register tape so the next customer can be served. */
   const handleHoldCart = () => {
     if (cart.length === 0) return;
-    setHeldCart(cart);
+    const parked = holdCartInto();
+    setHeldCarts((prev) => [...prev, parked]);
     setCart([]);
     setDiscountValue(0);
     setDiscountType('amount');
+    setAttachedCustomer(null);
+    setIsHeldListOpen(true);
+    soundService.playBeep();
   };
 
-  const handleRecallCart = () => {
-    if (!heldCart) return;
-    setCart(heldCart);
-    setHeldCart(null);
+  /** Restore a held customer's cart. If the register has partial items for
+   *  another customer, those are parked automatically first so nothing is lost. */
+  const handleRecallCart = (id: string) => {
+    const held = heldCarts.find((h) => h.id === id);
+    if (!held) return;
+
+    setHeldCarts((prev) => {
+      let next = prev.filter((h) => h.id !== id);
+      if (cart.length > 0) {
+        // Auto-park whatever is currently on the register tape.
+        const partial: HeldCartSnapshot = {
+          id: `held-${Date.now()}`,
+          label: nextHeldLabel(next.length),
+          lines: cart,
+          discountType,
+          discountValue,
+          attachedCustomerId: attachedCustomer?.id ?? null,
+          attachedCustomerName: attachedCustomer?.name,
+          heldAt: Date.now(),
+        };
+        next = [...next, partial];
+      }
+      return next;
+    });
+
+    setCart(held.lines);
+    setDiscountType(held.discountType);
+    setDiscountValue(held.discountValue);
+    const restoredCustomer = held.attachedCustomerId
+      ? posDb.getCustomerById(held.attachedCustomerId) ?? null
+      : null;
+    setAttachedCustomer(
+      restoredCustomer ??
+        (held.attachedCustomerName
+          ? { id: 'HELD-CUSTOMER', name: held.attachedCustomerName } as Customer
+          : null)
+    );
+    setIsHeldListOpen(false);
+    soundService.playBeep();
+  };
+
+  const handleRenameHeldCart = (id: string, label: string) => {
+    setHeldCarts((prev) =>
+      prev.map((h) => (h.id === id ? { ...h, label: label || 'Held Order' } : h))
+    );
+  };
+
+  const handleDiscardHeldCart = (id: string) => {
+    const held = heldCarts.find((h) => h.id === id);
+    if (!held) return;
+    if (!confirm(`Discard held order "${held.label}"? This cannot be undone.`)) return;
+    setHeldCarts((prev) => prev.filter((h) => h.id !== id));
+    soundService.playErrorBeep();
   };
 
   return (
@@ -1040,26 +1104,35 @@ export const CashierPOS: React.FC<CashierPOSProps> = ({
               </div>
 
               <div className="flex items-center gap-1.5">
-                {heldCart ? (
+                {cart.length > 0 && (
                   <button
-                    onClick={handleRecallCart}
-                    className="flex items-center gap-1 bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-1 rounded text-[11px] font-medium hover:bg-amber-500/30 transition-colors"
-                    title="Recall Held Order"
+                    onClick={handleHoldCart}
+                    className="flex items-center gap-1 bg-slate-800 text-slate-300 border border-slate-700 px-2 py-1 rounded text-[11px] font-medium hover:bg-slate-700 transition-colors"
+                    title="Put this cart on hold and serve the next customer"
                   >
-                    <PlayCircle className="w-3.5 h-3.5" />
-                    <span>Recall Order</span>
+                    <PauseCircle className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Hold</span>
                   </button>
-                ) : (
-                  cart.length > 0 && (
-                    <button
-                      onClick={handleHoldCart}
-                      className="flex items-center gap-1 bg-slate-800 text-slate-300 border border-slate-700 px-2 py-1 rounded text-[11px] font-medium hover:bg-slate-700 transition-colors"
-                      title="Hold Cart"
-                    >
-                      <PauseCircle className="w-3.5 h-3.5 text-amber-400" />
-                      <span>Hold</span>
-                    </button>
-                  )
+                )}
+
+                {heldCarts.length > 0 && (
+                  <button
+                    onClick={() => setIsHeldListOpen((v) => !v)}
+                    className={`flex items-center gap-1 px-2 py-1 rounded text-[11px] font-bold transition-colors border ${
+                      isHeldListOpen
+                        ? 'bg-amber-500/30 text-amber-200 border-amber-500/50'
+                        : 'bg-amber-500/15 text-amber-300 border-amber-500/30 hover:bg-amber-500/25'
+                    }`}
+                    title={`${heldCarts.length} ${heldCarts.length === 1 ? 'customer cart' : 'customer carts'} on hold`}
+                  >
+                    <Layers className="w-3.5 h-3.5" />
+                    <span>{heldCarts.length} Held</span>
+                    {isHeldListOpen ? (
+                      <ChevronUp className="w-3 h-3" />
+                    ) : (
+                      <ChevronDown className="w-3 h-3" />
+                    )}
+                  </button>
                 )}
 
                 {cart.length > 0 && (
@@ -1073,6 +1146,81 @@ export const CashierPOS: React.FC<CashierPOSProps> = ({
                 )}
               </div>
             </div>
+
+            {/* Held Carts Panel — parked customers waiting to return */}
+            {isHeldListOpen && heldCarts.length > 0 && (
+              <div className="mt-2.5 bg-slate-900/60 border border-amber-500/20 rounded-xl p-2 space-y-2">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                  <PauseCircle className="w-3.5 h-3.5 text-amber-400" />
+                  Held Carts — recall a customer to continue their order
+                </p>
+                {heldCarts.map((held) => {
+                  const units = held.lines.reduce((s, l) => s + l.quantity, 0);
+                  const heldTotals = calculateCartTotals(
+                    held.lines,
+                    held.discountType,
+                    held.discountValue || 0,
+                    vatRate,
+                    exchangeRate
+                  );
+                  const heldMinutes = Math.max(0, Math.floor((Date.now() - held.heldAt) / 60000));
+                  return (
+                    <div
+                      key={held.id}
+                      className="bg-[#0F1115] border border-slate-800 rounded-lg p-2"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <input
+                          value={held.label}
+                          onChange={(e) => handleRenameHeldCart(held.id, e.target.value)}
+                          aria-label={`Edit held cart label for ${held.label}`}
+                          className="bg-transparent text-xs font-bold text-amber-200 border-b border-dashed border-slate-700 focus:border-amber-400 focus:outline-none w-36 truncate"
+                        />
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            onClick={() => handleRecallCart(held.id)}
+                            title={`Recall ${held.label}'s order`}
+                            className="p-1.5 rounded-lg bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 transition-colors"
+                          >
+                            <PlayCircle className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDiscardHeldCart(held.id)}
+                            title="Discard this held order"
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="mt-1 flex items-center justify-between text-[10px] text-slate-400">
+                        <span>
+                          {held.lines.length} {held.lines.length === 1 ? 'line' : 'lines'} •{' '}
+                          {units} {units === 1 ? 'unit' : 'units'}
+                        </span>
+                        <span className="font-mono font-bold text-emerald-400">
+                          {primarySymbol} {heldTotals.grandTotal.toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="mt-0.5 text-[10px] text-slate-500 truncate">
+                        {held.attachedCustomerName && (
+                          <span className="text-cyan-400 font-semibold">{held.attachedCustomerName} • </span>
+                        )}
+                        {held.discountValue > 0 && (
+                          <span className="text-amber-400 font-semibold">
+                            {held.discountType === 'percent'
+                              ? `${held.discountValue}%`
+                              : `${primarySymbol}${held.discountValue.toFixed(2)}`}{' '}
+                            off •{' '}
+                          </span>
+                        )}
+                        Held {heldMinutes === 0 ? 'just now' : heldMinutes < 60 ? `${heldMinutes} min ago` : `${Math.floor(heldMinutes / 60)}h ${heldMinutes % 60}m ago`}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
 
             {/* Attached Customer Badge */}
             {attachedCustomer ? (

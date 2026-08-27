@@ -281,16 +281,6 @@ export const CustomerDisplay: React.FC<CustomerDisplayProps> = ({
               )}
             </div>
           </div>
-
-          {/* Last Scanned Item Spotlight */}
-          {state.lastScannedItem && (
-            <div className="bg-emerald-950/40 border border-emerald-800/50 p-3 rounded-xl text-xs flex items-center justify-between text-emerald-300">
-              <span className="font-semibold truncate">
-                Scanned: [{state.lastScannedItem.brand || 'Ocean'}] {state.lastScannedItem.name}
-              </span>
-              <span className="font-mono font-bold">{currentSymbol} {(state.lastScannedItem.price / currentRate).toFixed(2)}</span>
-            </div>
-          )}
         </div>
 
         {/* Grand Total Side Display (5 cols) */}

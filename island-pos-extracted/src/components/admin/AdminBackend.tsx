@@ -61,14 +61,11 @@ import { DEFAULT_BARCODE_RULES, parseAndExecuteBarcode } from '../../utils/barco
 import {
   CASHIER_GATE_OPTIONS,
   CASHIER_GATE_GROUPS,
-  CASHIER_ACCESS_TIERS,
   DEFAULT_STAFF_CASHIER_ACCESS,
   applyAccessTierPreset,
-  roleForAccessTier,
   getEffectiveCashierAccess,
   summarizeCashierAccess,
 } from '../../utils/cashierAccess';
-import type { CashierAccessTier } from '../../utils/cashierAccess';
 import { AutoBackupModal } from './AutoBackupModal';
 import { CurrencySearchPicker } from './CurrencySearchPicker';
 import { downloadSQLiteDbFile } from '../../utils/sqliteExport';
@@ -303,8 +300,7 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
   const [newStaffPin, setNewStaffPin] = useState('');
   const [newStaffRole, setNewStaffRole] = useState<StaffRole>('cashier');
   const [staffError, setStaffError] = useState('');
-  // Per-cashier security gates (tier preset + manual gate picker)
-  const [newStaffTier, setNewStaffTier] = useState<CashierAccessTier>('cashier');
+  // Per-cashier security gates (manual gate picker, seeded from the role preset)
   const [newStaffAccess, setNewStaffAccess] = useState<Record<CashierAccessArea, boolean>>(() => applyAccessTierPreset('cashier'));
 
   // Reset PIN Modal
@@ -490,7 +486,6 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
     setNewStaffUsername('');
     setNewStaffPin('');
     setNewStaffRole('cashier');
-    setNewStaffTier('cashier');
     setNewStaffAccess(applyAccessTierPreset('cashier'));
     setStaffError('');
     setIsAddStaffModalOpen(false);
@@ -595,7 +590,7 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
   };
 
   const handleApplyBulkPriceAdjustment = () => {
-    const affected = posDb.bulkAdjustPrices(bulkCategory, bulkAmount, bulkMode);
+        const affected = posDb.bulkAdjustPrices(bulkCategory, bulkAmount, bulkMode, { user: 'Admin' });
     onRefreshData();
     setPricingSuccessMsg(`Applied bulk price change to ${affected} products.`);
     setTimeout(() => setPricingSuccessMsg(''), 4000);
@@ -1985,47 +1980,29 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
 
                   <div>
                     <label className="block text-xs font-semibold text-slate-300 mb-1">
-                      Access Tier &amp; Security Gates:
+                      System Role (supervisor PIN authority):
                     </label>
                     <select
-                      value={newStaffTier}
+                      value={newStaffRole}
                       onChange={(e) => {
-                        const tier = e.target.value as CashierAccessTier;
-                        setNewStaffTier(tier);
-                        setNewStaffAccess(applyAccessTierPreset(tier));
-                        const mappedRole = roleForAccessTier(tier);
-                        if (mappedRole) setNewStaffRole(mappedRole);
+                        const role = e.target.value as StaffRole;
+                        setNewStaffRole(role);
+                        // Seed the per-cashier gate map from the matching preset.
+                        setNewStaffAccess(applyAccessTierPreset(role));
                       }}
                       className="w-full bg-[#0F1115] border border-[#1E293B] rounded-xl px-3 py-2 text-xs text-[#E2E8F0] focus:outline-none focus:border-emerald-500"
                     >
-                      {CASHIER_ACCESS_TIERS.map((t) => (
-                        <option key={t.tier} value={t.tier}>{t.label}</option>
-                      ))}
+                      <option value="cashier">Cashier</option>
+                      <option value="senior_cashier">Senior Cashier</option>
+                      <option value="shift_lead">Shift Lead</option>
+                      <option value="admin">Administrator (Full Access)</option>
                     </select>
                     <p className="text-[10px] text-slate-500 mt-1">
-                      Gates apply to this account's register sessions; disabled register actions prompt for a Manager PIN.
+                      Role governs Manager-PIN authority; the gates below apply to this account's register sessions.
                     </p>
                   </div>
 
-                  {newStaffTier === 'custom' && (
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-300 mb-1">
-                        System Role (supervisor PIN authority):
-                      </label>
-                      <select
-                        value={newStaffRole}
-                        onChange={(e) => setNewStaffRole(e.target.value as StaffRole)}
-                        className="w-full bg-[#0F1115] border border-[#1E293B] rounded-xl px-3 py-2 text-xs text-[#E2E8F0] focus:outline-none focus:border-emerald-500"
-                      >
-                        <option value="cashier">Cashier</option>
-                        <option value="senior_cashier">Senior Cashier</option>
-                        <option value="shift_lead">Shift Lead</option>
-                        <option value="admin">Administrator (Full Access)</option>
-                      </select>
-                    </div>
-                  )}
-
-                  {newStaffTier !== 'admin' && (
+                  {newStaffRole !== 'admin' && (
                     <AccessGatePickerPanel
                       access={newStaffAccess}
                       onToggle={(area) =>

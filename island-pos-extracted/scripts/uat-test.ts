@@ -220,6 +220,7 @@ async function main() {
     recordedBy: 'Admin',
   });
   check('T3.1a', '$50 advance logged against artisan profile', posDb.getVendorAdvances(artisan.id).length === 1 && advance.amount === 50);
+  check('T3.1c', 'Advance recorded in audit trail as vendor_advance by Admin', posDb.getAuditLog().some((l) => l.action === 'vendor_advance' && l.user === 'Admin' && l.entityId === artisan.id));
   const preAdvExpected = posDb.getActiveEODSession()!.expectedCash;
   posDb.recordCashAdjustment('cash_drop', 50, 'Admin', 'Advance paid to Local Shell Crafter');
   check('T3.1b', 'Till reduced by the $50 advance', approx(posDb.getActiveEODSession()!.expectedCash, preAdvExpected - 50));
@@ -244,6 +245,7 @@ async function main() {
   posDb.recordVendorPayout(artisan.id, finalPayout, `Month-end settlement incl $${advancesPaid} advance deduction`);
   const paidRecord = posDb.getPayoutRecords().find((r) => r.vendorId === artisan.id);
   check('T3.3d', 'Settlement recorded as paid', !!paidRecord && paidRecord.status === 'paid' && paidRecord.payoutAmount === finalPayout);
+  check('T3.3e', 'Payout recorded in audit trail as vendor_payout by Admin', posDb.getAuditLog().some((l) => l.action === 'vendor_payout' && l.user === 'Admin' && l.entityId === artisan.id));
 
   // T3.4 Unsold inventory on deposit
   // Shells: deposited 50, sold 1, refunded back +1 → 50. Deluxe keyrings: 30 − 8 = 22.

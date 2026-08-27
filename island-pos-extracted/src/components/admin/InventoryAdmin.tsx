@@ -40,6 +40,7 @@ import {
 } from 'lucide-react';
 import { InventoryItem, Vendor, StaffUser } from '../../types/pos';
 import { posDb } from '../../services/db';
+import { getEffectiveCashierAccess } from '../../utils/cashierAccess';
 import { BarcodePrinterModal } from './BarcodePrinterModal';
 import { CsvImportModal } from './CsvImportModal';
 import { AutoBackupModal } from './AutoBackupModal';
@@ -137,6 +138,8 @@ export const InventoryAdmin: React.FC<InventoryAdminProps> = ({
   const isAdmin = currentStaff?.role === 'admin';
   const isSupervisor = currentStaff?.role === 'senior_cashier' || currentStaff?.role === 'shift_lead';
   const isCashier = currentStaff?.role === 'cashier';
+  // Resolve the logged-in cashier's per-account security gates (admin → full access).
+  const cashierAccess = getEffectiveCashierAccess(currentStaff, posDb.getSettings());
 
   const [securityGateModal, setSecurityGateModal] = useState<{
     isOpen: boolean;
@@ -150,8 +153,10 @@ export const InventoryAdmin: React.FC<InventoryAdminProps> = ({
     onSuccess: () => {},
   });
 
-  const requireAdminAuth = (title: string, description: string, onSuccess: () => void) => {
-    if (isAdmin) {
+  /** Gate-aware auth: cashiers who were granted the corresponding gate run directly. */
+  const requireInventoryEdit = (title: string, description: string, onSuccess: () => void) => {
+    // Admin OR cashier whose per-account gates include Create & Edit Inventory.
+    if (isAdmin || cashierAccess.inventory_edit) {
       onSuccess();
     } else {
       setSecurityGateModal({
@@ -230,7 +235,10 @@ export const InventoryAdmin: React.FC<InventoryAdminProps> = ({
 
   const handleQuickStockAdjust = (itemId: string, delta: number, e: React.MouseEvent) => {
     e.stopPropagation();
-    posDb.adjustStock(itemId, delta);
+    posDb.adjustStock(itemId, delta, {
+      user: currentStaff?.name || 'Admin',
+      reason: `Quick stock adjust ${delta >= 0 ? '+' : ''}${delta} from inventory panel`,
+    });
     onRefreshData();
   };
   const [activePresetsList, setActivePresetsList] = useState(getStoredCategoryPresets());
@@ -571,24 +579,32 @@ export const InventoryAdmin: React.FC<InventoryAdminProps> = ({
       }) || `${formData.category}${formData.variant ? ' - ' + formData.variant : ''}`;
     }
 
-    const savedItem = posDb.saveItem({
-      ...(editingItem ? { id: editingItem.id } : {}),
-      name: finalName,
-      brand: formData.brand,
-      category: formData.category,
-      productLine: formData.productLine,
-      size: formData.size,
-      variant: formData.variant,
-      sku: formData.sku,
-      stockLevel: Number(formData.stockLevel),
-      minStockThreshold: Number(formData.minStockThreshold),
-      retailPrice: Number(formData.retailPrice),
-      costBasis: Number(formData.costBasis),
-      vatRate: Number(formData.vatRate),
-      taxable: true,
-      vendorId: formData.vendorId,
-      imageUrl: formData.imageUrl || undefined,
-    });
+    const savedItem = posDb.saveItem(
+      {
+        ...(editingItem ? { id: editingItem.id } : {}),
+        name: finalName,
+        brand: formData.brand,
+        category: formData.category,
+        productLine: formData.productLine,
+        size: formData.size,
+        variant: formData.variant,
+        sku: formData.sku,
+        stockLevel: Number(formData.stockLevel),
+        minStockThreshold: Number(formData.minStockThreshold),
+        retailPrice: Number(formData.retailPrice),
+        costBasis: Number(formData.costBasis),
+        vatRate: Number(formData.vatRate),
+        taxable: true,
+        vendorId: formData.vendorId,
+        imageUrl: formData.imageUrl || undefined,
+      },
+      editingItem
+        ? {
+            user: currentStaff?.name || 'Admin',
+            reason: 'Catalog item edited from inventory panel',
+          }
+        : undefined
+    );
 
     setIsItemModalOpen(false);
     onRefreshData();
@@ -837,7 +853,7 @@ export const InventoryAdmin: React.FC<InventoryAdminProps> = ({
           </button>
 
           <button
-            onClick={() => requireAdminAuth('CSV Import Restricted', 'Shop Owner or Manager PIN required to bulk import catalog data via CSV.', () => setIsCsvModalOpen(true))}
+            onClick={() => requireInventoryEdit('CSV Import Restricted', 'Shop Owner or Manager PIN required to bulk import catalog data via CSV.', () => setIsCsvModalOpen(true))}
             className="bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 px-3 py-2 rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-xs"
           >
             <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
@@ -845,7 +861,7 @@ export const InventoryAdmin: React.FC<InventoryAdminProps> = ({
           </button>
 
           <button
-            onClick={() => requireAdminAuth('Apparel Matrix Restricted', 'Shop Owner or Manager PIN required to create matrix products.', () => handleOpenMatrixModal())}
+            onClick={() => requireInventoryEdit('Apparel Matrix Restricted', 'Shop Owner or Manager PIN required to create matrix products.', () => handleOpenMatrixModal())}
             className="bg-gradient-to-r from-emerald-600/20 to-cyan-600/20 hover:from-emerald-600/30 hover:to-cyan-600/30 text-emerald-300 border border-emerald-500/40 px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-xs"
             title="Open Apparel Matrix Grid (Color columns × Size rows generator)"
           >
@@ -862,7 +878,7 @@ export const InventoryAdmin: React.FC<InventoryAdminProps> = ({
           </button>
 
           <button
-            onClick={() => requireAdminAuth('Add Item Restricted', 'Shop Owner or Manager PIN required to add new inventory products.', () => handleOpenAddModal())}
+            onClick={() => requireInventoryEdit('Add Item Restricted', 'Shop Owner or Manager PIN required to add new inventory products.', () => handleOpenAddModal())}
             className="bg-emerald-600 hover:bg-emerald-500 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-1.5"
           >
             <Plus className="w-4 h-4" />

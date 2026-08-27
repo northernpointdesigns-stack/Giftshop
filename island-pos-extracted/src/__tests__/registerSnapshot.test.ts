@@ -17,6 +17,15 @@ const line = (id: string, qty: number, extra: Record<string, unknown> = {}) => (
   ...extra,
 });
 
+const emptySnapshot = {
+  cart: [],
+  discountType: 'amount' as const,
+  discountValue: 0,
+  heldCarts: [],
+  attachedCustomer: null,
+  savedAt: 0,
+};
+
 describe('registerSnapshot — durable register basket', () => {
   beforeEach(() => localStorage.clear());
 
@@ -29,7 +38,18 @@ describe('registerSnapshot — durable register basket', () => {
       cart: [line('i1', 2, { resolvedPrice: 25 })],
       discountType: 'percent',
       discountValue: 10,
-      heldCart: [line('i2', 1)],
+      heldCarts: [
+        {
+          id: 'held-1',
+          label: 'Customer A',
+          lines: [line('i2', 1)],
+          discountType: 'amount',
+          discountValue: 5,
+          attachedCustomerId: 'C1',
+          attachedCustomerName: 'Tourist',
+          heldAt: 5000,
+        },
+      ],
       attachedCustomer: { id: 'C1', name: 'Tourist' } as any,
       savedAt: 123,
     });
@@ -40,12 +60,39 @@ describe('registerSnapshot — durable register basket', () => {
     expect(snap.cart[0].resolvedPrice).toBe(25);
     expect(snap.discountType).toBe('percent');
     expect(snap.discountValue).toBe(10);
-    expect(snap.heldCart).toHaveLength(1);
+    expect(snap.heldCarts).toHaveLength(1);
+    expect(snap.heldCarts[0].label).toBe('Customer A');
+    expect(snap.heldCarts[0].lines).toHaveLength(1);
+    expect(snap.heldCarts[0].lines[0].item.id).toBe('i2');
+    expect(snap.heldCarts[0].attachedCustomerName).toBe('Tourist');
+    expect(snap.heldCarts[0].heldAt).toBe(5000);
     expect(snap.attachedCustomer?.name).toBe('Tourist');
   });
 
+  it('migrates a legacy single-slot heldCart into the heldCarts list', () => {
+    localStorage.setItem(
+      'giftshop:register-snapshot:REG-1',
+      JSON.stringify({
+        cart: [],
+        discountType: 'amount',
+        discountValue: 0,
+        heldCart: [line('i9', 3)],
+        attachedCustomer: null,
+        savedAt: 987,
+      })
+    );
+    const snap = loadRegisterSnapshot('REG-1', [item('i9', 12)])!;
+    expect(snap.heldCarts).toHaveLength(1);
+    expect(snap.heldCarts[0].label).toBe('Held Order');
+    expect(snap.heldCarts[0].lines).toHaveLength(1);
+    expect(snap.heldCarts[0].lines[0].item.id).toBe('i9');
+    expect(snap.heldCarts[0].lines[0].quantity).toBe(3);
+    expect(snap.heldCarts[0].lines[0].item.retailPrice).toBe(12); // refreshed from inventory
+    expect(snap.heldCarts[0].heldAt).toBe(987);
+  });
+
   it('refreshes item data from live inventory (price/stock updates apply)', () => {
-    saveRegisterSnapshot('REG-1', { cart: [line('i1', 1)], discountType: 'amount', discountValue: 0, heldCart: null, attachedCustomer: null, savedAt: 0 });
+    saveRegisterSnapshot('REG-1', { ...emptySnapshot, cart: [line('i1', 1)] });
     const fresh = item('i1', 99);
     (fresh as any).stockLevel = 7;
     const snap = loadRegisterSnapshot('REG-1', [fresh])!;
@@ -54,7 +101,7 @@ describe('registerSnapshot — durable register basket', () => {
   });
 
   it('keeps the stored item when the product is missing from inventory (never loses a scanned line)', () => {
-    saveRegisterSnapshot('REG-1', { cart: [line('ghost', 3)], discountType: 'amount', discountValue: 0, heldCart: null, attachedCustomer: null, savedAt: 0 });
+    saveRegisterSnapshot('REG-1', { ...emptySnapshot, cart: [line('ghost', 3)] });
     const snap = loadRegisterSnapshot('REG-1', [])!; // inventory not loaded / product deleted
     expect(snap.cart).toHaveLength(1);
     expect(snap.cart[0].item.id).toBe('ghost');
@@ -66,7 +113,7 @@ describe('registerSnapshot — durable register basket', () => {
       cart: [null, 'junk', { item: { id: 'i1' }, quantity: -5, isDamaged: 'yes', damageDiscountPercent: 300 }] as any,
       discountType: 'amount',
       discountValue: -50,
-      heldCart: null,
+      heldCarts: [],
       attachedCustomer: null,
       savedAt: 0,
     });
@@ -78,14 +125,46 @@ describe('registerSnapshot — durable register basket', () => {
     expect(snap.discountValue).toBe(0);
   });
 
+  it('hydrates held carts defensively (sanitizes ids, labels, discounts and timestamps)', () => {
+    localStorage.setItem(
+      'giftshop:register-snapshot:REG-1',
+      JSON.stringify({
+        ...emptySnapshot,
+        heldCarts: [
+          null,
+          'junk',
+          {
+            id: '',
+            label: 5,
+            lines: 'nope',
+            discountType: 'percent',
+            discountValue: -20,
+            attachedCustomerId: 42,
+            heldAt: 'bad',
+          },
+          { id: 'h-2', label: 'Customer B', lines: [line('i3', 2)] },
+        ],
+      })
+    );
+    const snap = loadRegisterSnapshot('REG-1', [item('i3', 4)])!;
+    expect(snap.heldCarts).toHaveLength(1); // malformed entries skipped
+    expect(snap.heldCarts[0].id).toBe('h-2');
+    expect(snap.heldCarts[0].label).toBe('Customer B');
+    expect(snap.heldCarts[0].lines[0].item.retailPrice).toBe(4);
+    expect(snap.heldCarts[0].discountType).toBe('amount');
+    expect(snap.heldCarts[0].discountValue).toBe(0);
+    expect(snap.heldCarts[0].attachedCustomerId).toBeNull();
+    expect(typeof snap.heldCarts[0].heldAt).toBe('number');
+  });
+
   it('survives corrupted JSON', () => {
     localStorage.setItem('giftshop:register-snapshot:REG-1', '{not json');
     expect(loadRegisterSnapshot('REG-1', [])).toBeNull();
   });
 
   it('keeps registers isolated from each other', () => {
-    saveRegisterSnapshot('REG-1', { cart: [line('i1', 1)], discountType: 'amount', discountValue: 0, heldCart: null, attachedCustomer: null, savedAt: 0 });
-    saveRegisterSnapshot('REG-2', { cart: [line('i2', 4)], discountType: 'amount', discountValue: 0, heldCart: null, attachedCustomer: null, savedAt: 0 });
+    saveRegisterSnapshot('REG-1', { ...emptySnapshot, cart: [line('i1', 1)] });
+    saveRegisterSnapshot('REG-2', { ...emptySnapshot, cart: [line('i2', 4)] });
     const inv = [item('i1', 10), item('i2', 5)];
     expect(loadRegisterSnapshot('REG-1', inv)!.cart[0].item.id).toBe('i1');
     expect(loadRegisterSnapshot('REG-2', inv)!.cart[0].item.id).toBe('i2');
@@ -93,7 +172,7 @@ describe('registerSnapshot — durable register basket', () => {
   });
 
   it('clearRegisterSnapshot removes the basket', () => {
-    saveRegisterSnapshot('REG-1', { cart: [line('i1', 1)], discountType: 'amount', discountValue: 0, heldCart: null, attachedCustomer: null, savedAt: 0 });
+    saveRegisterSnapshot('REG-1', emptySnapshot);
     clearRegisterSnapshot('REG-1');
     expect(loadRegisterSnapshot('REG-1', [])).toBeNull();
   });

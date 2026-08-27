@@ -13,6 +13,7 @@
 | Apple Silicon DMG package | Pass | `npm run build-desktop`; 149 MB DMG |
 | Basket discount VAT reconciliation | Pass after fix | A 100.00 item at 15% VAT with a 20.00 basket discount now saves 80.00 subtotal, 12.00 VAT, and 92.00 total. |
 | 5,000-SKU import and search | Pass after fix | 5,000 rows imported in 462 ms with two storage writes; exact and partial lookup under 1 ms in the test environment. |
+| Audit exception trail (SEC-004) | Pass | Append-only `auditLog` (storage key `island_pos_audit_log_v1`); `pushAuditEntry`/`getAuditLog` capture every stock adjust, price/cost/vat override, bulk price change, refund/void, vendor advance and payout with user+timestamp+action+reason. Entries are frozen and not double-logged for sale/restock flows. |
 | Consignment sale, advance, return, EOD variance | Pass after fix | 5 sold/1 returned restores stock to 46; a 20.00 advance reduces the vendor balance; expected cash 176.00 and a 10.00 shortage closes at -10.00. |
 | Physical peripherals | Not run | Requires the target scanner/printer/drawer/display/scale. |
 | Live payment terminal | Not supported/testable | No integrated acquirer/terminal SDK is configured. |
@@ -61,7 +62,7 @@
 | SEC-001 | Cashier cannot reach admin configuration/cost-margin functions | Pending |
 | SEC-002 | Refund, drawer open, and overrides require the configured authority | Pending |
 | SEC-003 | Idle timeout returns to the login/lock screen | Pending |
-| SEC-004 | Audit records include user, timestamp, action, and reason | Pending |
+| SEC-004 | Audit records include user, timestamp, action, and reason | Pass | `npx vitest run src/__tests__/audit/AuditTrail.test.ts src/__tests__/spec/SpecScenarioTest.test.ts` — 12 scenarios covering stock_adjust, price_change/cost_change/vat_change, bulk_price_change, vendor_advance, vendor_payout, refund, and void actions. |
 | SEC-005 | No PAN, CVV, or PIN is stored in app data/logs | Pending; no card-terminal integration is present |
 | RES-001 | Offline cash sale is retained across restart | Pending |
 | RES-002 | Offline queue state/total are accurate and reconnect does not duplicate records | Pending |

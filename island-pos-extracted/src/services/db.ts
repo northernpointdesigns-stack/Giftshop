@@ -13,6 +13,7 @@ import {
   Customer,
   VendorAdvance,
   Invoice,
+  AuditLogEntry,
   SplitPaymentLine,
   PriceList,
      CashRegisterTerminal,
@@ -52,6 +53,7 @@ const STORAGE_KEYS = {
   CUSTOMERS: 'island_pos_customers_v2',
   ADVANCES: 'island_pos_advances_v2',
   INVOICES: 'island_pos_invoices_v2',
+  AUDIT_LOG: 'island_pos_audit_log_v1',
 };
 
 const DEFAULT_CUSTOMERS: Customer[] = [];
@@ -234,6 +236,8 @@ class PosDatabase {
   private customers: Customer[] = [];
   private vendorAdvances: VendorAdvance[] = [];
   private invoices: Invoice[] = [];
+  /** Append-only audit / exception trail (stock edits, overrides, refunds, vendor finance). */
+  private auditLog: AuditLogEntry[] = [];
   // Bulk catalog imports may create thousands of items. Defer persistence
   // until the complete batch is in memory rather than serializing the entire
   // catalog for every imported row.
@@ -259,6 +263,7 @@ class PosDatabase {
       const cust = localStorage.getItem(STORAGE_KEYS.CUSTOMERS);
       const adv = localStorage.getItem(STORAGE_KEYS.ADVANCES);
       const inv = localStorage.getItem(STORAGE_KEYS.INVOICES);
+      const al = localStorage.getItem(STORAGE_KEYS.AUDIT_LOG);
 
       this.vendors = v ? JSON.parse(v) : DEFAULT_VENDORS;
       this.inventory = i ? JSON.parse(i) : DEFAULT_INVENTORY;
@@ -270,6 +275,7 @@ class PosDatabase {
       this.customers = cust ? JSON.parse(cust) : DEFAULT_CUSTOMERS;
       this.vendorAdvances = adv ? JSON.parse(adv) : [];
       this.invoices = inv ? JSON.parse(inv) : [];
+      this.auditLog = al ? JSON.parse(al) : [];
 
       this.eodSessions = e ? JSON.parse(e) : [];
 
@@ -315,31 +321,7 @@ class PosDatabase {
         staffChanged = true;
       }
 
-      if (!this.staffUsers.some((u) => u.username === 'cynthia' || u.id === 'STAFF-CYNTHIA')) {
-        this.staffUsers.push({
-          id: 'STAFF-CYNTHIA',
-          name: 'Cynthia (Head Cashier)',
-          username: 'cynthia',
-          pin: '8888',
-          role: 'senior_cashier',
-          status: 'active',
-          createdAt: new Date().toISOString(),
-        });
-        staffChanged = true;
-      }
-
-      if (!this.staffUsers.some((u) => u.username === 'maya' || u.id === 'STAFF-MAYA')) {
-        this.staffUsers.push({
-          id: 'STAFF-MAYA',
-          name: 'Maya Cashier',
-          username: 'maya',
-          pin: '1234',
-          role: 'cashier',
-          status: 'active',
-          createdAt: new Date().toISOString(),
-        });
-        staffChanged = true;
-      }
+      // Default staff initialization removed so deleted staff stay deleted permanently across app reboots.
 
       if (!v) this.saveVendors();
       if (!i) this.saveInventory();
@@ -359,6 +341,7 @@ class PosDatabase {
       this.categories = DEFAULT_CATEGORIES;
       this.drawerLogs = DEFAULT_DRAWER_LOGS;
       this.customers = DEFAULT_CUSTOMERS;
+      this.auditLog = [];
     }
   }
 
@@ -430,6 +413,36 @@ class PosDatabase {
     localStorage.setItem(STORAGE_KEYS.CUSTOMERS, JSON.stringify(this.customers));
   }
 
+  private saveAuditLog() {
+    try {
+      localStorage.setItem(STORAGE_KEYS.AUDIT_LOG, JSON.stringify(this.auditLog));
+    } catch {
+      // Audit persistence is best-effort; entries remain in memory for the session.
+    }
+  }
+
+  /**
+   * Append an immutable audit/exception record. Entries are never edited or
+   * removed through the public API, giving an unalterable trail of register
+   * voids, stock adjustments, price overrides, and vendor financial movement.
+   */
+    public pushAuditEntry(entry: Omit<AuditLogEntry, 'id' | 'timestamp'>): AuditLogEntry {
+    const fullEntry: AuditLogEntry = Object.freeze({
+      ...entry,
+      id: this.generateId('AUD'),
+      timestamp: new Date().toISOString(),
+    });
+    // Frozen: audit entries are append-only and must not be mutated in place.
+    this.auditLog.unshift(fullEntry);
+    this.saveAuditLog();
+    return fullEntry;
+  }
+
+  /** Full append-only trail, newest first. */
+  public getAuditLog(): AuditLogEntry[] {
+    return [...this.auditLog];
+  }
+
   // Reset / Seed DB
   public resetToDefault() {
     this.vendors = DEFAULT_VENDORS;
@@ -461,6 +474,8 @@ class PosDatabase {
     this.saveEODSessions();
     this.saveSettings();
     this.saveDrawerLogs();
+    this.auditLog = [];
+    this.saveAuditLog();
   }
 
   // --- VENDOR ADVANCES (partial payments against consignment balance) ---
@@ -486,6 +501,18 @@ class PosDatabase {
       newAdvance.recordedBy,
       `Vendor advance to ${newAdvance.vendorName}: ${newAdvance.note || 'Advance against consignment balance'}`
     );
+    this.pushAuditEntry({
+      user: newAdvance.recordedBy || 'Admin',
+      action: 'vendor_advance',
+      entityType: 'vendor',
+      entityId: newAdvance.vendorId,
+      entityLabel: newAdvance.vendorName,
+      // Advances are money paid to the vendor; the audit trail records the
+      // negative cash flow as the new ledger position so the settlement guard
+      // is fully traceable.
+      newValue: `-${newAdvance.amount.toFixed(2)} (${newAdvance.id})`,
+      reason: newAdvance.note || 'Advance against consignment balance',
+    });
     return newAdvance;
   }
 
@@ -902,7 +929,10 @@ class PosDatabase {
     );
   }
 
-  public saveItem(itemData: Omit<InventoryItem, 'id' | 'createdAt'> & { id?: string }): InventoryItem {
+  public saveItem(
+    itemData: Omit<InventoryItem, 'id' | 'createdAt'> & { id?: string },
+    audit?: { user?: string; reason?: string }
+  ): InventoryItem {
     const vendor = this.getVendorById(itemData.vendorId);
     let calculatedCostBasis = itemData.costBasis;
 
@@ -915,14 +945,57 @@ class PosDatabase {
     if (itemData.id) {
       const idx = this.inventory.findIndex((i) => i.id === itemData.id);
       if (idx !== -1) {
+        const previous = this.inventory[idx];
         this.inventory[idx] = {
-          ...this.inventory[idx],
+          ...previous,
           ...itemData,
           brand: itemData.brand || vendor?.brandName || 'Unbranded',
           costBasis: calculatedCostBasis,
           vatRate,
         };
         this.saveInventory();
+        // Audit material field overrides on existing records (creates are not
+        // 'exceptions', and bulk catalog imports call without audit meta).
+        if (audit) {
+          const user = audit.user || 'Admin';
+          const reason = audit.reason || 'Catalog item edited';
+          if (Number(previous.retailPrice) !== Number(itemData.retailPrice)) {
+            this.pushAuditEntry({
+              user,
+              action: 'price_change',
+              entityType: 'inventory',
+              entityId: this.inventory[idx].id,
+              entityLabel: this.inventory[idx].name,
+              originalValue: String(previous.retailPrice),
+              newValue: String(itemData.retailPrice),
+              reason,
+            });
+          }
+          if (Number(previous.costBasis) !== Number(calculatedCostBasis)) {
+            this.pushAuditEntry({
+              user,
+              action: 'cost_change',
+              entityType: 'inventory',
+              entityId: this.inventory[idx].id,
+              entityLabel: this.inventory[idx].name,
+              originalValue: String(previous.costBasis),
+              newValue: String(calculatedCostBasis),
+              reason,
+            });
+          }
+          if (Math.abs(Number(previous.vatRate ?? 0) - Number(vatRate ?? 0)) > 0.0001) {
+            this.pushAuditEntry({
+              user,
+              action: 'vat_change',
+              entityType: 'inventory',
+              entityId: this.inventory[idx].id,
+              entityLabel: this.inventory[idx].name,
+              originalValue: String(previous.vatRate ?? 0),
+              newValue: String(vatRate ?? 0),
+              reason,
+            });
+          }
+        }
         return this.inventory[idx];
       }
     }
@@ -1013,11 +1086,31 @@ class PosDatabase {
     return { added, updated };
   }
 
-  public adjustStock(itemId: string, qtyDelta: number): InventoryItem | undefined {
+  public adjustStock(
+    itemId: string,
+    qtyDelta: number,
+    audit?: { user?: string; reason?: string }
+  ): InventoryItem | undefined {
     const item = this.inventory.find((i) => i.id === itemId);
     if (item) {
+      const previous = item.stockLevel;
       item.stockLevel = Math.max(0, item.stockLevel + qtyDelta);
       this.saveInventory();
+      // Only user-driven manual adjustments are audited here. Sale decrements
+      // and refund restocks are already captured by their transaction/refund
+      // records and call without the audit meta to avoid double-logging.
+      if (audit) {
+        this.pushAuditEntry({
+          user: audit.user || 'Admin',
+          action: 'stock_adjust',
+          entityType: 'inventory',
+          entityId: item.id,
+          entityLabel: item.name,
+          originalValue: String(previous),
+          newValue: String(item.stockLevel),
+          reason: audit.reason || `Manual stock adjustment of ${qtyDelta >= 0 ? '+' : ''}${qtyDelta} units`,
+        });
+      }
       return item;
     }
     return undefined;
@@ -1632,6 +1725,23 @@ class PosDatabase {
       });
     }
 
+    // Audit trail: refunds/voids are exceptions that must be traceable.
+    const isVoid = /void/i.test(refundReason || '');
+    this.pushAuditEntry({
+      user: cashierName || 'Authorized Cashier',
+      action: isVoid ? 'void' : 'refund',
+      entityType: 'transaction',
+      entityId: transaction.receiptNumber,
+      entityLabel: transaction.originalReceiptNumber
+        ? `Refund of ${transaction.originalReceiptNumber}`
+        : isVoid
+          ? 'Register line void'
+          : 'Register refund/return',
+      originalValue: `+${(0 - total).toFixed(2)}`,
+      newValue: `${total.toFixed(2)}`,
+      reason: refundReason || (isVoid ? 'Void' : 'Refund'),
+    });
+
     return transaction;
   }
 
@@ -1845,7 +1955,7 @@ class PosDatabase {
     });
   }
 
-  public recordVendorPayout(vendorId: string, amount: number, periodNotes: string): ConsignmentPayoutRecord {
+  public recordVendorPayout(vendorId: string, amount: number, periodNotes: string, recordedBy?: string): ConsignmentPayoutRecord {
     const vendor = this.getVendorById(vendorId);
     const newRecord: ConsignmentPayoutRecord = {
       id: `PAY-${Date.now()}`,
@@ -1864,6 +1974,15 @@ class PosDatabase {
 
     this.payouts.unshift(newRecord);
     this.savePayouts();
+    this.pushAuditEntry({
+      user: recordedBy || 'Admin',
+      action: 'vendor_payout',
+      entityType: 'vendor',
+      entityId: vendorId,
+      entityLabel: vendor ? vendor.name : 'Vendor',
+      newValue: `+${amount.toFixed(2)} (${newRecord.id})`,
+      reason: periodNotes || 'Consignment settlement payout',
+    });
     return newRecord;
   }
 
@@ -2070,7 +2189,12 @@ class PosDatabase {
     return this.inventory[idx];
   }
 
-  public bulkAdjustPrices(categoryFilter: string, amount: number, mode: 'percentage' | 'flat'): number {
+    public bulkAdjustPrices(
+    categoryFilter: string,
+    amount: number,
+    mode: 'percentage' | 'flat',
+    audit?: { user?: string }
+  ): number {
     let affectedCount = 0;
     this.inventory = this.inventory.map((item) => {
       if (categoryFilter === 'ALL' || item.category === categoryFilter) {
@@ -2096,10 +2220,20 @@ class PosDatabase {
         };
       }
       return item;
-    });
+        });
 
     if (affectedCount > 0) {
       this.saveInventory();
+      if (audit) {
+        this.pushAuditEntry({
+          user: audit.user || 'Admin',
+          action: 'bulk_price_change',
+          entityType: 'inventory',
+          originalValue: String(affectedCount),
+          newValue: `${categoryFilter} ${mode} ${amount >= 0 ? '+' : ''}${amount}`,
+          reason: `Bulk ${mode === 'percentage' ? 'percentage' : 'flat'} price change applied to ${affectedCount} product(s) in category "${categoryFilter}"`,
+        });
+      }
     }
     return affectedCount;
   }

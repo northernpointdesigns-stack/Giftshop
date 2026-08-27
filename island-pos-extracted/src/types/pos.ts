@@ -163,6 +163,39 @@ export interface VendorAdvance {
   recordedBy: string;
 }
 
+// --- AUDIT LOG (immutable exception trail) ------------------------------
+/** Action categories captured by the append-only audit log. */
+export type AuditAction =
+  | 'stock_adjust'
+  | 'price_change'
+  | 'cost_change'
+  | 'vat_change'
+  | 'item_edit'
+  | 'bulk_price_change'
+  | 'refund'
+  | 'void'
+  | 'vendor_advance'
+  | 'vendor_payout';
+
+/**
+ * One immutable record in the store's audit / exception trail. Entries are
+ * append-only via PosDatabase.pushAuditEntry() — an editor (user + timestamp)
+ * and original→new value pair are captured so every override, stock edit,
+ * refund/void, and vendor financial movement is traceable per the audit spec.
+ */
+export interface AuditLogEntry {
+  id: string;
+  timestamp: string; // ISO
+  user: string;
+  action: AuditAction;
+  entityType: 'inventory' | 'vendor' | 'transaction';
+  entityId?: string;
+  entityLabel?: string;
+  originalValue?: string;
+  newValue?: string;
+  reason?: string;
+}
+
 export interface InvoiceLine {
   description: string;
   quantity: number;
@@ -540,12 +573,6 @@ export interface CustomerDisplayState {
   secondaryItemDiscount?: number;
   secondaryTax?: number;
   secondaryTotal?: number;
-  lastScannedItem?: {
-    name: string;
-    brand?: string;
-    price: number;
-    stockRemaining?: number;
-  };
   splitPaymentsPreview?: {
     method: string;
     currencyCode: string;

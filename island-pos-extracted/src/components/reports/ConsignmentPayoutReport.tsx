@@ -124,7 +124,12 @@ export const ConsignmentPayoutReport: React.FC<ConsignmentPayoutReportProps> = (
         `Process consignment payout of ${primarySymbol} ${amount.toFixed(2)} to ${vendorName}? This marks period payout complete.`
       )
     ) {
-      posDb.recordVendorPayout(vendorId, amount, payoutNotes || 'End of Period Consignment Settlement');
+            posDb.recordVendorPayout(
+        vendorId,
+        amount,
+        payoutNotes || 'End of Period Consignment Settlement',
+        'Admin'
+      );
       setPayoutNotes('');
       onRefreshData();
     }

@@ -7,15 +7,20 @@ interface LowStockAlertsModalProps {
   lowStockItems: InventoryItem[];
   onClose: () => void;
   onRefreshData: () => void;
+  currentStaffName?: string;
 }
 
 export const LowStockAlertsModal: React.FC<LowStockAlertsModalProps> = ({
   lowStockItems,
   onClose,
   onRefreshData,
+  currentStaffName,
 }) => {
   const handleQuickRestock = (itemId: string, addQty: number = 10) => {
-    posDb.adjustStock(itemId, addQty);
+    posDb.adjustStock(itemId, addQty, {
+      user: currentStaffName || 'Authorized Staff',
+      reason: `Quick restock +${addQty} from low-stock alerts`,
+    });
     onRefreshData();
   };
 

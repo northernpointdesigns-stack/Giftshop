@@ -685,6 +685,7 @@ export default function App() {
           lowStockItems={lowStockItems}
           onClose={() => setIsLowStockModalOpen(false)}
           onRefreshData={refreshData}
+          currentStaffName={currentStaff?.name || 'Admin'}
         />
       )}
 

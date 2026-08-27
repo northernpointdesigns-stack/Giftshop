@@ -121,10 +121,11 @@ export const VendorSettlementReport: React.FC<VendorSettlementReportProps> = ({
         )} as paid?\n\nThis records a payout entry and zeroes the outstanding balance for the selected period.`
       )
     ) {
-      posDb.recordVendorPayout(
+            posDb.recordVendorPayout(
         snap.vendor.id,
         snap.periodSales.vendorPayout,
-        `Period settlement ${dateFrom ? `from ${dateFrom}` : ''} ${dateTo ? `to ${dateTo}` : ''}`
+        `Period settlement ${dateFrom ? `from ${dateFrom}` : ''} ${dateTo ? `to ${dateTo}` : ''}`,
+        'Admin'
       );
       onRefreshData();
     }
