@@ -35,6 +35,7 @@ import { offlineSyncEngine, OfflineSyncStatus } from '../../services/offlineSync
 import { WifiOff, RefreshCw } from 'lucide-react';
 import { customerChannel } from '../../services/customerChannel';
 import { calculateCartTotals, getMultiCurrencyEquivalents } from '../../utils/currencyAndMath';
+import { getEffectiveCashierAccess } from '../../utils/cashierAccess';
 import { BarcodeScannerEmulated } from './BarcodeScannerEmulated';
 import { CheckoutModal } from './CheckoutModal';
 import { DiscountModal } from './DiscountModal';
@@ -89,6 +90,9 @@ export const CashierPOS: React.FC<CashierPOSProps> = ({
   priceNoticeMsg,
 }) => {
   const settings = posDb.getSettings();
+  // Per-cashier security gates resolved for the logged-in staff member
+  // (admin → full; staff with own gates → those; legacy staff → global map).
+  const cashierAccess = getEffectiveCashierAccess(currentStaff, settings);
   const primarySymbol = settings.primaryCurrencySymbol || '$';
 ;
   const primaryCode = settings.primaryCurrency || 'USD';
@@ -585,7 +589,7 @@ export const CashierPOS: React.FC<CashierPOSProps> = ({
 
   // Security Gated Action Handlers
   const handleOpenDiscount = () => {
-    const isAllowed = settings.cashierAccess?.discounts ?? true;
+    const isAllowed = cashierAccess.discounts;
     if (isAllowed) {
       setIsDiscountModalOpen(true);
     } else {
@@ -602,7 +606,7 @@ export const CashierPOS: React.FC<CashierPOSProps> = ({
   };
 
   const handleOpenRefund = () => {
-    const isAllowed = settings.cashierAccess?.refunds ?? false;
+    const isAllowed = cashierAccess.refunds;
     if (isAllowed) {
       setIsRefundModalOpen(true);
     } else {
@@ -619,7 +623,7 @@ export const CashierPOS: React.FC<CashierPOSProps> = ({
   };
 
   const handleToggleDamaged = (itemId: string) => {
-    const isAllowed = settings.cashierAccess?.damaged_markdowns ?? true;
+    const isAllowed = cashierAccess.damaged_markdowns;
     const currentItem = cart.find((c) => c.item.id === itemId);
     const willEnable = currentItem ? !currentItem.isDamaged : true;
 

@@ -15,7 +15,10 @@ import {
   Invoice,
   SplitPaymentLine,
   PriceList,
-  CashRegisterTerminal,
+     CashRegisterTerminal,
+   VendorLedgerSnapshot,
+   LedgerLineItem,
+   LedgerPeriodTotals,
 } from '../types/pos';
 import { ParsedCsvRow } from './csvParser';
 import { generateSQLiteDatabaseDump, extractSqliteManifest } from '../utils/sqliteExport';
@@ -1031,11 +1034,134 @@ class PosDatabase {
   }
 
   // --- TRANSACTIONS & RECORDING ---
-  public getTransactions(): Transaction[] {
+    public getTransactions(): Transaction[] {
     return [...this.transactions].sort(
       (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
     );
   }
+
+  /**
+   * Full itemized ledger for a single vendor across a date range.
+   *
+   * Pure read — no writes. Reuses getVendorAdvances() and the payouts table
+   * so it covers BOTH consignment vendors (split rate applies) AND wholesale
+   * suppliers (cost+margin, no split, tracked on credit).
+   *
+   * The returned `netOwing` is what the vendor should currently receive (or
+   * be billed) for the period: vendorPayout − advances − prior settlements.
+   */
+  public getVendorLedger(
+    vendorId: string,
+    from?: string,
+    to?: string
+  ): VendorLedgerSnapshot {
+    const vendor = this.getVendorById(vendorId);
+
+    if (!vendor) {
+      return {
+        vendor: null,
+        transactions: [],
+        advances: [],
+        settlements: [],
+        periodSales: {
+          totalUnits: 0,
+          grossSales: 0,
+          vat: 0,
+          houseCut: 0,
+          vendorPayout: 0,
+        },
+        advanceTotal: 0,
+        settledTotal: 0,
+        netOwing: 0,
+        isWholesale: false,
+      };
+    }
+
+    const fromMs = from ? Date.parse(from) : -Infinity;
+    const toMs = to ? Date.parse(to) : Infinity;
+
+    const isConsignment = vendor.supplierType === 'consignment';
+
+    // Build itemized ledger lines for this vendor's sales within the date range.
+    const txLines: LedgerLineItem[] = [];
+    this.transactions.forEach((tx) => {
+      const txMs = Date.parse(tx.timestamp);
+      if (txMs < fromMs || txMs > toMs) return;
+
+      tx.items.forEach((item) => {
+        if (item.vendorId !== vendor.id) return;
+        txLines.push({
+          txId: tx.id,
+          receiptNumber: tx.receiptNumber,
+          timestamp: tx.timestamp,
+          isRefund: !!tx.isRefund,
+          refundReason: tx.refundReason,
+          sku: item.sku,
+          name: item.name,
+          brand: item.brand,
+          category: item.category,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          totalPrice: item.totalPrice,
+          vatAmount: item.vatAmount,
+          costBasis: item.costBasis,
+          houseCut: item.houseProfitAmount,
+          vendorPayout: item.vendorPayoutAmount,
+          supplierType: item.supplierType,
+        });
+      });
+    });
+
+    // Roll up the period totals (refunds reduce the totals, preserving the
+    // signed quantity so units can go negative across the period).
+    let totalUnits = 0;
+    let grossSales = 0;
+    let vat = 0;
+    let houseCut = 0;
+    let vendorPayout = 0;
+    txLines.forEach((l) => {
+      const absQty = Math.abs(l.quantity);
+      const absGross = Math.abs(l.totalPrice);
+      const absVat = Math.abs(l.vatAmount);
+      const absCut = Math.abs(l.houseCut);
+      const absPayout = Math.abs(l.vendorPayout);
+
+      const sign = l.isRefund ? -1 : 1;
+      totalUnits += absQty * sign;
+      grossSales += absGross * sign;
+      vat += absVat * sign;
+      houseCut += absCut * sign;
+      vendorPayout += absPayout * sign;
+    });
+
+    const advances = this.getVendorAdvances(vendor.id);
+    const advanceTotal = advances.reduce((s, a) => s + a.amount, 0);
+
+    // Prior settlements already paid out for this vendor.
+    const settlements = this.payouts.filter(
+      (p) => p.vendorId === vendor.id && p.status === 'paid'
+    );
+    const settledTotal = settlements.reduce((s, p) => s + p.payoutAmount, 0);
+
+    return {
+      vendor,
+      transactions: txLines,
+      advances,
+      settlements,
+      periodSales: {
+        totalUnits,
+        grossSales: Number(grossSales.toFixed(2)),
+        vat: Number(vat.toFixed(2)),
+        houseCut: Number(houseCut.toFixed(2)),
+        vendorPayout: Number(vendorPayout.toFixed(2)),
+      },
+      advanceTotal: Number(advanceTotal.toFixed(2)),
+      settledTotal: Number(settledTotal.toFixed(2)),
+      netOwing: Number((vendorPayout - advanceTotal - settledTotal).toFixed(2)),
+      isWholesale: !isConsignment,
+    };
+  }
+
 
   public recordTransaction(
     items: {

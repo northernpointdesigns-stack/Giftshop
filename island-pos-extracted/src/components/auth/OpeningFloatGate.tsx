@@ -40,15 +40,11 @@ export const OpeningFloatGate: React.FC<OpeningFloatGateProps> = ({
   const secCode = settings.secondaryCurrency || '';
   const secSymbol = settings.secondaryCurrencySymbol || secCode;
 
-  // Rate prompt needed when a real second currency is configured but the
-  // stored rate is missing or was last confirmed more than 24 hours ago.
-  const rateAge = settings.exchangeRateUpdatedAt
-    ? Date.now() - new Date(settings.exchangeRateUpdatedAt).getTime()
-    : Infinity;
-  const needsRate =
+  // Show the exchange rate option always if a secondary currency is configured
+  // so the cashier can verify/adjust the daily rate at the start of every business day.
+  const showRateField =
     !!secCode &&
-    secCode !== (settings.primaryCurrency || '') &&
-    (!settings.exchangeRate || settings.exchangeRate <= 0 || rateAge > RATE_MAX_AGE_MS);
+    secCode !== (settings.primaryCurrency || '');
 
   const [floatAmount, setFloatAmount] = useState('');
   const [rateInput, setRateInput] = useState(
@@ -59,7 +55,7 @@ export const OpeningFloatGate: React.FC<OpeningFloatGateProps> = ({
 
   const parsedRate = parseFloat(rateInput);
   const rateValid =
-    !needsRate || (!isNaN(parsedRate) && parsedRate > 0 && rateInput.trim() !== '');
+    !showRateField || (!isNaN(parsedRate) && parsedRate > 0 && rateInput.trim() !== '');
 
   const today = new Date().toLocaleDateString(undefined, {
     weekday: 'long',
@@ -72,7 +68,7 @@ export const OpeningFloatGate: React.FC<OpeningFloatGateProps> = ({
     e.preventDefault();
     if (!isValid) return;
     if (!rateValid) return;
-    if (needsRate && parsedRate > 0) {
+    if (showRateField && parsedRate > 0) {
       posDb.updateSettings({
         exchangeRate: parsedRate,
         exchangeRateUpdatedAt: new Date().toISOString(),
@@ -162,8 +158,8 @@ export const OpeningFloatGate: React.FC<OpeningFloatGateProps> = ({
             </div>
           </div>
 
-          {/* Today's Exchange Rate card (only when due) */}
-          {needsRate && (
+          {/* Today's Exchange Rate card (always editable if secondary currency is configured) */}
+          {showRateField && (
             <div className="rounded-xl bg-[#0F1115] border border-cyan-500/30 p-4">
               <label className="flex items-center gap-2 text-xs font-bold text-slate-300 mb-2 uppercase tracking-wider">
                 <RefreshCw className="w-4 h-4 text-cyan-400" />

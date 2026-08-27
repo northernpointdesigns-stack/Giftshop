@@ -167,9 +167,32 @@ export interface InvoiceLine {
   description: string;
   quantity: number;
   unitPrice: number;
+  /** Per-line "TAXED" flag: only X-marked lines count toward the taxable subtotal. */
+  taxed?: boolean;
+  /** Purchase-order ITEM # / SKU reference column. */
+  itemRef?: string;
 }
 
 export type InvoiceStatus = 'draft' | 'sent' | 'partial' | 'paid' | 'cancelled';
+
+/** Document kind rendered from the business document layouts. */
+export type InvoiceKind = 'invoice' | 'quote' | 'purchase_order';
+
+/** Payment terms — drives the automatic DUE DATE (issue date + N days). */
+export type InvoiceTerms = 'due_on_receipt' | 'net_15' | 'net_30' | 'net_60' | 'custom';
+
+/** Tax engine mode: no tax, tax on the whole subtotal, or tax on TAXED-flagged lines only. */
+export type InvoiceTaxMode = 'none' | 'subtotal' | 'per_line';
+
+/** Collections follow-up log entry (phone call, email, letter, in-person visit). */
+export interface InvoiceFollowUp {
+  id: string;
+  date: string; // ISO timestamp
+  method: 'call' | 'email' | 'letter' | 'in_person';
+  stage: string; // suggested sequence stage at the time of logging
+  note?: string;
+  recordedBy: string;
+}
 
 export interface InvoicePayment {
   id: string;
@@ -183,14 +206,37 @@ export interface InvoicePayment {
 export interface Invoice {
   id: string;
   invoiceNumber: string;
+  kind?: InvoiceKind; // default 'invoice'
   customerName: string;
   customerContact?: string; // phone / email / address
+  customerId?: string; // CUSTOMER ID meta field
+  shipTo?: string; // SHIP TO block (multi-line)
   lines: InvoiceLine[];
   notes?: string;
   status: InvoiceStatus;
   payments: InvoicePayment[];
   createdAt: string;
   createdBy: string;
+  // --- Document meta ---
+  issueDate?: string; // ISO date printed as DATE; defaults to createdAt
+  dueDate?: string; // ISO date; auto = issueDate + terms days
+  terms?: InvoiceTerms; // default 'net_30'
+  // --- Tax engine (Vertex42-style Subtotal / Taxable / Tax due / Other / Total) ---
+  taxMode?: InvoiceTaxMode; // default 'none' for legacy records
+  taxRate?: number; // fraction, e.g. 0.0625 (defaults to settings.defaultVatRate)
+  otherLabel?: string; // e.g. 'Shipping' or 'Discount'
+  otherAmount?: number;
+  // --- Quote-specific ---
+  preparedBy?: string;
+  termsAndConditions?: string;
+  // --- Purchase-order-specific ---
+  vendor?: string;
+  requisitioner?: string;
+  shipVia?: string;
+  fob?: string;
+  shippingTerms?: string;
+  // --- Collections follow-up sequence ---
+  followUps?: InvoiceFollowUp[];
 }
 
 export interface ConsignmentPayoutRecord {
@@ -446,6 +492,13 @@ export interface StaffUser {
   role: StaffRole;
   status: 'active' | 'suspended';
   createdAt: string;
+  /**
+   * Per-cashier security gates. When set, overrides the store-wide
+   * cashierAccess map for this cashier's sessions (admins always get full
+   * access). Legacy accounts without this map keep inheriting the global map
+   * via getEffectiveCashierAccess().
+   */
+  cashierAccess?: Partial<Record<CashierAccessArea, boolean>>;
 }
 
 export interface CategoryTab {
@@ -519,6 +572,61 @@ export interface AutoBackupSnapshot {
   customerCount: number;
   totalSales: number;
   sizeBytes: number;
-  dbSqlContent: string;
+      dbSqlContent: string;
   jsonContent: string;
+}
+
+// ---------------------------------------------------------------------------
+// VENDOR LEDGER (per-vendor settlement statements)
+// ---------------------------------------------------------------------------
+
+/**
+ * One itemized line in a vendor's ledger — derived from a transaction's
+ * TransactionItem plus its surrounding receipt context.
+ */
+export interface LedgerLineItem {
+  txId: string;
+  receiptNumber: string;
+  timestamp: string;
+  isRefund: boolean;
+  refundReason?: string;
+  sku: string;
+  name: string;
+  brand?: string;
+  category: string;
+  quantity: number;
+  unitPrice: number;
+  totalPrice: number;
+  vatAmount: number;
+  costBasis: number;
+  houseCut: number;
+  vendorPayout: number;
+  supplierType: SupplierType;
+}
+
+/**
+ * Period-level roll-up for the lines returned in a ledger snapshot.
+ */
+export interface LedgerPeriodTotals {
+  totalUnits: number;
+  grossSales: number;
+  vat: number;
+  houseCut: number;
+  vendorPayout: number;
+}
+
+/**
+ * Full itemized ledger for a single vendor, used to build the per-vendor
+ * traceability statement (deposit -> sale -> settlement).
+ */
+export interface VendorLedgerSnapshot {
+  vendor: Vendor | null;
+  transactions: LedgerLineItem[];
+  advances: VendorAdvance[];
+  settlements: ConsignmentPayoutRecord[];
+  periodSales: LedgerPeriodTotals;
+  advanceTotal: number;
+  settledTotal: number;
+  netOwing: number;
+  isWholesale: boolean;
 }

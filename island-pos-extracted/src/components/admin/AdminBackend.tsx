@@ -58,6 +58,17 @@ import { posDb, DEFAULT_SETTINGS } from '../../services/db';
 import { priceTierSyncService, PriceSyncResult, PriceSyncLogEntry } from '../../services/priceTierSyncService';
 import { InventoryItem, StaffUser, StaffRole, CategoryTab, StoreSettings, CashierAccessArea, BarcodeMappingRule, BarcodeAction, BarcodeMatchType, PriceList, CashRegisterTerminal } from '../../types/pos';
 import { DEFAULT_BARCODE_RULES, parseAndExecuteBarcode } from '../../utils/barcodeEngine';
+import {
+  CASHIER_GATE_OPTIONS,
+  CASHIER_GATE_GROUPS,
+  CASHIER_ACCESS_TIERS,
+  DEFAULT_STAFF_CASHIER_ACCESS,
+  applyAccessTierPreset,
+  roleForAccessTier,
+  getEffectiveCashierAccess,
+  summarizeCashierAccess,
+} from '../../utils/cashierAccess';
+import type { CashierAccessTier } from '../../utils/cashierAccess';
 import { AutoBackupModal } from './AutoBackupModal';
 import { CurrencySearchPicker } from './CurrencySearchPicker';
 import { downloadSQLiteDbFile } from '../../utils/sqliteExport';
@@ -65,6 +76,62 @@ import { CategoryPresetAdmin } from './CategoryPresetAdmin';
 import { getStoredCategoryPresets } from '../../utils/categoryProfiles';
 import { printReceipt } from '../../utils/printReceipt';
 import { soundService } from '../../services/audio';
+
+// ---------------------------------------------------------------------------
+// Per-Cashier Access Gate Picker (shared by Create Cashier + Edit Gates modals)
+// ---------------------------------------------------------------------------
+function AccessGatePickerPanel({
+  access,
+  onToggle,
+  title,
+}: {
+  access: Record<CashierAccessArea, boolean>;
+  onToggle: (area: CashierAccessArea) => void;
+  title: string;
+}) {
+  return (
+    <div className="bg-[#0F1115] border border-[#1E293B] rounded-xl p-3">
+      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2 flex items-center gap-1.5">
+        <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> {title}
+      </p>
+      <div className="space-y-2.5 max-h-64 overflow-y-auto pr-1">
+        {CASHIER_GATE_GROUPS.map(({ group, title: groupTitle }) => (
+          <div key={group}>
+            <p className="text-[10px] font-bold text-emerald-500/80 uppercase tracking-wide mb-1">{groupTitle}</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+              {CASHIER_GATE_OPTIONS.filter((opt) => opt.group === group).map((opt) => (
+                <label
+                  key={opt.area}
+                  title={opt.description || opt.label}
+                  className={`flex items-start gap-2 p-2 rounded-lg border cursor-pointer transition-colors ${
+                    access[opt.area]
+                      ? 'bg-emerald-500/10 border-emerald-500/30'
+                      : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={!!access[opt.area]}
+                    onChange={() => onToggle(opt.area)}
+                    className="mt-0.5 accent-emerald-500"
+                  />
+                  <span className="min-w-0">
+                    <span className={`block text-[11px] font-semibold leading-tight ${access[opt.area] ? 'text-emerald-300' : 'text-slate-300'}`}>
+                      {opt.label}
+                    </span>
+                    {opt.description && (
+                      <span className="block text-[9px] text-slate-500 leading-tight mt-0.5">{opt.description}</span>
+                    )}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 interface AdminBackendProps {
   inventory: InventoryItem[];
@@ -84,7 +151,7 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
   const [loginError, setLoginError] = useState('');
 
   // Active Admin Tab
-  const [adminTab, setAdminTab] = useState<'register' | 'pricing' | 'tabs' | 'pills' | 'cashiers' | 'permissions' | 'receipts' | 'whitelabel' | 'feedback' | 'settings' | 'barcodes' | 'hardware' | 'comms'>('register');
+  const [adminTab, setAdminTab] = useState<'register' | 'pricing' | 'tabs' | 'pills' | 'cashiers' | 'receipts' | 'whitelabel' | 'feedback' | 'settings' | 'barcodes' | 'hardware' | 'comms'>('register');
   const [isPresetModalOpen, setIsPresetModalOpen] = useState(false);
 
   // Price Lists & Terminals State
@@ -236,6 +303,9 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
   const [newStaffPin, setNewStaffPin] = useState('');
   const [newStaffRole, setNewStaffRole] = useState<StaffRole>('cashier');
   const [staffError, setStaffError] = useState('');
+  // Per-cashier security gates (tier preset + manual gate picker)
+  const [newStaffTier, setNewStaffTier] = useState<CashierAccessTier>('cashier');
+  const [newStaffAccess, setNewStaffAccess] = useState<Record<CashierAccessArea, boolean>>(() => applyAccessTierPreset('cashier'));
 
   // Reset PIN Modal
   const [editingStaffId, setEditingStaffId] = useState<string | null>(null);
@@ -413,12 +483,15 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
       pin: newStaffPin.trim(),
       role: newStaffRole,
       status: 'active',
+      cashierAccess: { ...newStaffAccess },
     });
 
     setNewStaffName('');
     setNewStaffUsername('');
     setNewStaffPin('');
     setNewStaffRole('cashier');
+    setNewStaffTier('cashier');
+    setNewStaffAccess(applyAccessTierPreset('cashier'));
     setStaffError('');
     setIsAddStaffModalOpen(false);
     loadBackendData();
@@ -449,6 +522,29 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
     posDb.updateStaffUser(id, { pin: resetPinValue.trim() });
     setEditingStaffId(null);
     setResetPinValue('');
+    loadBackendData();
+    onRefreshData();
+  };
+
+  // Per-Cashier Access Gate Editor
+  const [gateEditStaff, setGateEditStaff] = useState<StaffUser | null>(null);
+  const [gateEditDraft, setGateEditDraft] = useState<Record<CashierAccessArea, boolean>>(DEFAULT_STAFF_CASHIER_ACCESS);
+
+  const openGateEditor = (staff: StaffUser) => {
+    setGateEditStaff(staff);
+    // Seed the draft with what this account currently resolves to (its own
+    // gates, or the global map it inherits) so the admin sees reality first.
+    setGateEditDraft(getEffectiveCashierAccess(staff, settings));
+  };
+
+  const handleToggleGateEdit = (area: CashierAccessArea) => {
+    setGateEditDraft((prev) => ({ ...prev, [area]: !prev[area] }));
+  };
+
+  const handleSaveGateEditor = () => {
+    if (!gateEditStaff) return;
+    posDb.updateStaffUser(gateEditStaff.id, { cashierAccess: { ...gateEditDraft } });
+    setGateEditStaff(null);
     loadBackendData();
     onRefreshData();
   };
@@ -923,7 +1019,7 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
           <button
             onClick={() => setAdminTab('cashiers')}
             className={`min-w-0 py-2.5 px-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all text-center cursor-pointer ${
-              adminTab === 'cashiers' || adminTab === 'permissions'
+              adminTab === 'cashiers'
                 ? 'bg-emerald-600 text-white shadow-md'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
             }`}
@@ -990,33 +1086,6 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
           <span className="w-full sm:w-auto text-[10px] text-slate-500 font-bold uppercase tracking-wider px-2 flex items-center gap-1">
             <Sliders className="w-3 h-3 text-emerald-400" /> Store Settings Sub-Category:
           </span>
-
-          {(adminTab === 'cashiers' || adminTab === 'permissions') && (
-            <>
-              <button
-                onClick={() => setAdminTab('cashiers')}
-                className={`px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition-all text-xs cursor-pointer ${
-                  adminTab === 'cashiers'
-                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-                }`}
-              >
-                <Users className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Cashier Staff Accounts ({staffList.length})</span>
-              </button>
-              <button
-                onClick={() => setAdminTab('permissions')}
-                className={`px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition-all text-xs cursor-pointer ${
-                  adminTab === 'permissions'
-                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-                }`}
-              >
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Cashier Security, PIN Gates &amp; Permissions Matrix</span>
-              </button>
-            </>
-          )}
 
           {(adminTab === 'pricing' || adminTab === 'tabs' || adminTab === 'pills') && (
             <>
@@ -1592,6 +1661,7 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
                   <th className="p-3.5">Staff Name</th>
                   <th className="p-3.5">Username / Employee ID</th>
                   <th className="p-3.5">System Role</th>
+                  <th className="p-3.5">Access Gates</th>
                   <th className="p-3.5">Security PIN</th>
                   <th className="p-3.5">Account Status</th>
                   <th className="p-3.5 text-right">Actions</th>
@@ -1625,6 +1695,24 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
                       </span>
                     </td>
 
+                    <td className="p-3.5 max-w-[220px]">
+                      {staff.role === 'admin' ? (
+                        <span className="text-[10px] font-bold text-purple-300 uppercase">Full Access (all gates)</span>
+                      ) : (
+                        <>
+                          <p className="text-[10px] text-slate-300 leading-snug" title={summarizeCashierAccess(staff.cashierAccess, 12)}>
+                            {summarizeCashierAccess(staff.cashierAccess)}
+                          </p>
+                          <button
+                            onClick={() => openGateEditor(staff)}
+                            className="mt-1 text-[10px] font-bold text-cyan-400 hover:text-cyan-300 flex items-center gap-1"
+                          >
+                            <ShieldCheck className="w-3 h-3" /> Edit Gates
+                          </button>
+                        </>
+                      )}
+                    </td>
+
                     <td className="p-3.5 font-mono text-slate-400">
                       <div className="flex items-center gap-2">
                         <span>{showPins[staff.id] ? staff.pin : '••••'}</span>
@@ -1653,6 +1741,14 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
                     </td>
 
                     <td className="p-3.5 text-right space-x-2">
+                      {staff.role !== 'admin' && (
+                        <button
+                          onClick={() => openGateEditor(staff)}
+                          className="bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/20 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors"
+                        >
+                          Edit Gates
+                        </button>
+                      )}
                       <button
                         onClick={() => {
                           setEditingStaffId(staff.id);
@@ -1769,10 +1865,59 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
             </div>
           )}
 
+          {/* Modal: Edit Per-Cashier Access Gates */}
+          {gateEditStaff && (
+            <div className="fixed inset-0 z-50 bg-[#0F1115]/85 flex items-center justify-center p-4">
+              <div className="bg-[#161B22] border border-[#1E293B] rounded-2xl p-6 max-w-2xl w-full text-[#E2E8F0] shadow-2xl relative">
+                <div className="flex items-center justify-between pb-3 border-b border-[#1E293B] mb-4">
+                  <div className="flex items-center gap-2 text-emerald-400">
+                    <ShieldCheck className="w-5 h-5" />
+                    <h3 className="font-bold text-base text-[#E2E8F0]">Security Gates — {gateEditStaff.name}</h3>
+                  </div>
+                  <button
+                    onClick={() => setGateEditStaff(null)}
+                    className="text-slate-400 hover:text-white"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <p className="text-xs text-slate-400 mb-3">
+                  These gates apply only to <span className="font-bold text-slate-200">{gateEditStaff.name}</span> ({gateEditStaff.role.replace('_', ' ')}).
+                  Disabled register actions prompt for a Manager PIN instead of being hidden.
+                </p>
+
+                <AccessGatePickerPanel
+                  access={gateEditDraft}
+                  onToggle={handleToggleGateEdit}
+                  title="Enabled Security Gates"
+                />
+
+                <div className="pt-4 border-t border-[#1E293B] mt-4 flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setGateEditStaff(null)}
+                    className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-xl text-xs font-medium"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveGateEditor}
+                    className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4 py-2 rounded-xl text-xs transition-all shadow-md flex items-center gap-1.5"
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>Save Security Gates</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Modal: Create New Cashier Account */}
           {isAddStaffModalOpen && (
             <div className="fixed inset-0 z-50 bg-[#0F1115]/85 flex items-center justify-center p-4">
-              <div className="bg-[#161B22] border border-[#1E293B] rounded-2xl p-6 max-w-md w-full text-[#E2E8F0] shadow-2xl relative">
+              <div className="bg-[#161B22] border border-[#1E293B] rounded-2xl p-6 max-w-2xl w-full text-[#E2E8F0] shadow-2xl relative">
                 <div className="flex items-center justify-between pb-3 border-b border-[#1E293B] mb-4">
                   <div className="flex items-center gap-2 text-emerald-400">
                     <UserPlus className="w-5 h-5" />
@@ -1840,19 +1985,55 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
 
                   <div>
                     <label className="block text-xs font-semibold text-slate-300 mb-1">
-                      System Role & Permissions:
+                      Access Tier &amp; Security Gates:
                     </label>
                     <select
-                      value={newStaffRole}
-                      onChange={(e) => setNewStaffRole(e.target.value as StaffRole)}
+                      value={newStaffTier}
+                      onChange={(e) => {
+                        const tier = e.target.value as CashierAccessTier;
+                        setNewStaffTier(tier);
+                        setNewStaffAccess(applyAccessTierPreset(tier));
+                        const mappedRole = roleForAccessTier(tier);
+                        if (mappedRole) setNewStaffRole(mappedRole);
+                      }}
                       className="w-full bg-[#0F1115] border border-[#1E293B] rounded-xl px-3 py-2 text-xs text-[#E2E8F0] focus:outline-none focus:border-emerald-500"
                     >
-                      <option value="cashier">Cashier (POS Register Only)</option>
-                      <option value="senior_cashier">Senior Cashier (POS Register + Refunds)</option>
-                      <option value="shift_lead">Shift Lead (POS + EOD Closing)</option>
-                      <option value="admin">Administrator (Full Access)</option>
+                      {CASHIER_ACCESS_TIERS.map((t) => (
+                        <option key={t.tier} value={t.tier}>{t.label}</option>
+                      ))}
                     </select>
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      Gates apply to this account's register sessions; disabled register actions prompt for a Manager PIN.
+                    </p>
                   </div>
+
+                  {newStaffTier === 'custom' && (
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 mb-1">
+                        System Role (supervisor PIN authority):
+                      </label>
+                      <select
+                        value={newStaffRole}
+                        onChange={(e) => setNewStaffRole(e.target.value as StaffRole)}
+                        className="w-full bg-[#0F1115] border border-[#1E293B] rounded-xl px-3 py-2 text-xs text-[#E2E8F0] focus:outline-none focus:border-emerald-500"
+                      >
+                        <option value="cashier">Cashier</option>
+                        <option value="senior_cashier">Senior Cashier</option>
+                        <option value="shift_lead">Shift Lead</option>
+                        <option value="admin">Administrator (Full Access)</option>
+                      </select>
+                    </div>
+                  )}
+
+                  {newStaffTier !== 'admin' && (
+                    <AccessGatePickerPanel
+                      access={newStaffAccess}
+                      onToggle={(area) =>
+                        setNewStaffAccess((prev) => ({ ...prev, [area]: !prev[area] }))
+                      }
+                      title="Security Gates for this Account"
+                    />
+                  )}
 
                   <div className="pt-3 border-t border-[#1E293B] flex items-center justify-end gap-2">
                     <button
@@ -3590,173 +3771,7 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* TAB: CASHIER SECURITY & PERMISSIONS */}
-      {/* ========================================================================= */}
-      {adminTab === 'permissions' && (
-        <div className="space-y-4 animate-in fade-in duration-200">
-          <div className="bg-[#161B22] border border-[#1E293B] rounded-2xl p-6 space-y-6 shadow-lg">
-            <div className="flex items-center justify-between border-b border-[#1E293B] pb-3">
-              <div>
-                <h3 className="text-sm font-bold text-[#E2E8F0] flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-emerald-400" /> Cashier Access Restrictions & Security Gates
-                </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Control which views cashier sessions can access, and which sensitive register actions require a Manager / Admin PIN code before proceeding.
-                </p>
-              </div>
-              <span className="text-[10px] text-cyan-400 font-mono font-semibold bg-cyan-950/40 border border-cyan-800/40 px-2.5 py-0.5 rounded-md shrink-0">
-                Strict Gate Enforcement
-              </span>
-            </div>
 
-            {/* Section 1: Register Action Authorization Gates */}
-            <div>
-              <div className="text-xs font-bold text-amber-300 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
-                <Lock className="w-3.5 h-3.5" /> Register Action Security Gates (Prompt Manager PIN if Disabled)
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 text-xs">
-                {([
-                  ['discounts', 'Apply order discounts (Prompt PIN if disabled)', false],
-                  ['refunds', 'Process refunds & returns (Prompt PIN if disabled)', false],
-                  ['damaged_markdowns', 'Mark items damaged / markdown (Prompt PIN if disabled)', false],
-                  ['void_cart', 'Void entire customer cart (Prompt PIN if disabled)', false],
-                  ['custom_pricing', 'Manual custom price override (Prompt PIN if disabled)', false],
-                ] as const).map(([area, label, locked]) => (
-                  <label key={area} className="flex items-center gap-2.5 bg-[#0F1115] border border-[#1E293B] hover:border-slate-700 rounded-xl px-3.5 py-2.5 text-slate-300 transition-colors cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={settings.cashierAccess?.[area as CashierAccessArea] ?? false}
-                      disabled={locked}
-                      onChange={(e) => {
-                        const currentAccess = settings.cashierAccess || DEFAULT_SETTINGS.cashierAccess;
-                        const nextAccess = {
-                          ...currentAccess,
-                          [area]: e.target.checked,
-                        };
-                        applySettingInstant({ cashierAccess: nextAccess });
-                      }}
-                      className="rounded text-emerald-600 focus:ring-emerald-500 focus:ring-offset-slate-900 h-4.5 w-4.5 cursor-pointer"
-                    />
-                    <span className={locked ? 'text-slate-500 font-semibold' : 'text-slate-200 font-semibold'}>{label}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {/* Section 2: Module & Navigation Access */}
-            <div className="pt-4 border-t border-[#1E293B]">
-              <div className="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
-                <Package className="w-3.5 h-3.5" /> Navigation &amp; Management Modules
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 text-xs">
-                {([
-                  ['pos', 'POS Terminal & Register', true],
-                  ['inventory', 'View Inventory Catalog', false],
-                  ['inventory_edit', 'Create & Edit Inventory Items', false],
-                  ['reports', 'View Reports & Analytics Dashboard', false],
-                  ['eod_close', 'End of Day Balancing & Cash Count', false],
-                  ['vendors', 'Vendor & Supplier Catalog', false],
-                  ['payouts', 'Consignment Payout Settlements', false],
-                  ['invoices', 'Wholesale Invoice Generation', false],
-                  ['customer_display', 'Customer Facing Display Control', false],
-                  ['settings', 'Store Settings & Whitelabeling (Admin Only)', true],
-                  ['staff', 'Staff & Cashier User Accounts (Admin Only)', true],
-                ] as const).map(([area, label, locked]) => (
-                  <label key={area} className="flex items-center gap-2.5 bg-[#0F1115] border border-[#1E293B] hover:border-slate-700 rounded-xl px-3.5 py-2.5 text-slate-300 transition-colors cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={settings.cashierAccess?.[area as CashierAccessArea] ?? (area === 'pos')}
-                      disabled={locked}
-                      onChange={(e) => {
-                        const currentAccess = settings.cashierAccess || DEFAULT_SETTINGS.cashierAccess;
-                        const nextAccess = {
-                          ...currentAccess,
-                          [area]: e.target.checked,
-                        };
-                        applySettingInstant({ cashierAccess: nextAccess });
-                      }}
-                      className="rounded text-emerald-600 focus:ring-emerald-500 focus:ring-offset-slate-900 h-4.5 w-4.5 cursor-pointer"
-                    />
-                    <span className={locked ? 'text-slate-500 font-semibold' : 'text-slate-200 font-semibold'}>{label}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {/* Section 3: Workspace Configurator */}
-            <div className="pt-4 border-t border-[#1E293B]">
-              <div className="text-xs font-bold text-cyan-400 uppercase tracking-wider mb-1 flex items-center gap-1.5">
-                <Sliders className="w-3.5 h-3.5" /> 💼 Workspace Configurator (Standard Cashier Dashboards)
-              </div>
-              <p className="text-[10px] text-slate-400 mb-3 leading-relaxed">
-                Select which advanced dashboard widgets and sub-reports are visible during standard cashier sessions. Unchecking options hides them completely, keeping non-admin workspaces minimal, fast, and secure.
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
-                {([
-                  ['reports_eod', 'EOD Drawer Balancing & Verification', 'Allows cashiers to declare closing cash and check register variance'],
-                  ['reports_pnl', 'Financial P&L Reports Widget', 'Provides high-level gross profits, margins, and sales costs summaries'],
-                  ['reports_heatmap', 'Sales Heatmap & Peak Hours Matrix', 'Displays hourly traffic intensity patterns and peak transaction times'],
-                  ['reports_forecasting', 'Sales Forecasting & Predictive Analytics', 'Injects predictive trendlines & linear regression future sales forecasts'],
-                  ['reports_history', 'Transaction History & Receipts Log', 'Grants standard accounts view of full historical receipts list']
-                ] as const).map(([area, label, description]) => (
-                  <div key={area} className="flex flex-col bg-[#0F1115] border border-[#1E293B] hover:border-slate-700 rounded-xl p-3.5 text-slate-300 transition-all">
-                    <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-200 select-none">
-                      <input
-                        type="checkbox"
-                        checked={settings.cashierAccess?.[area as CashierAccessArea] ?? (area === 'reports_eod')}
-                        onChange={(e) => {
-                          const currentAccess = settings.cashierAccess || DEFAULT_SETTINGS.cashierAccess;
-                          const nextAccess = {
-                            ...currentAccess,
-                            [area]: e.target.checked,
-                          };
-                          applySettingInstant({ cashierAccess: nextAccess });
-                        }}
-                        className="rounded text-emerald-600 focus:ring-emerald-500 focus:ring-offset-slate-900 h-4 w-4 cursor-pointer"
-                      />
-                      <span>{label}</span>
-                    </label>
-                    <span className="text-[10px] text-slate-500 mt-1.5 pl-6 leading-relaxed">
-                      {description}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Section 4: Inactivity Auto-Logout Security Timer */}
-            <div className="pt-4 border-t border-[#1E293B]">
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
-                  <Clock className="w-3.5 h-3.5 text-cyan-400" /> Inactivity Auto-Logout Security Timer
-                </label>
-                <span className="text-[10px] text-cyan-400 font-mono font-bold bg-cyan-950/40 border border-cyan-800/40 px-2 py-0.5 rounded-md">
-                  {settings.inactivityTimeoutMinutes !== undefined && settings.inactivityTimeoutMinutes > 0 ? `${settings.inactivityTimeoutMinutes} mins` : 'Disabled'}
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-400 mb-2.5">
-                Automatically redirect active staff sessions to the login screen after a defined period of user inactivity for enhanced terminal security.
-              </p>
-              <select
-                value={settings.inactivityTimeoutMinutes !== undefined ? settings.inactivityTimeoutMinutes : 15}
-                onChange={(e) => {
-                  const val = parseInt(e.target.value, 10);
-                  applySettingInstant({ inactivityTimeoutMinutes: val });
-                }}
-                className="w-full sm:w-80 bg-[#0F1115] border border-[#1E293B] text-cyan-300 font-bold px-3 py-2 rounded-xl text-xs focus:outline-none focus:border-cyan-500 cursor-pointer"
-              >
-                <option value={0}>Disabled (Never Auto-Logout)</option>
-                <option value={5}>5 Minutes of Inactivity</option>
-                <option value={10}>10 Minutes of Inactivity</option>
-                <option value={15}>15 Minutes of Inactivity (Recommended)</option>
-                <option value={30}>30 Minutes of Inactivity</option>
-                <option value={60}>60 Minutes (1 Hour)</option>
-              </select>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ========================================================================= */}
       {/* TAB 5: STORE SETTINGS, COMMUNICATIONS & WHITELABEL */}
@@ -4801,6 +4816,38 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
                 </div>
               </div>
             </div>
+            )}
+
+            {/* Inactivity Auto-Logout Security Timer — moved from legacy permissions tab */}
+            {adminTab === 'settings' && (
+              <div className="bg-[#161B22] border border-[#1E293B] rounded-2xl p-5 space-y-3 shadow-lg">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-cyan-400" /> Inactivity Auto-Logout Security Timer
+                  </label>
+                  <span className="text-[10px] text-cyan-400 font-mono font-bold bg-cyan-950/40 border border-cyan-800/40 px-2 py-0.5 rounded-md">
+                    {settings.inactivityTimeoutMinutes !== undefined && settings.inactivityTimeoutMinutes > 0 ? `${settings.inactivityTimeoutMinutes} mins` : 'Disabled'}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  Automatically redirect active staff sessions to the login screen after a defined period of user inactivity for enhanced terminal security.
+                </p>
+                <select
+                  value={settings.inactivityTimeoutMinutes !== undefined ? settings.inactivityTimeoutMinutes : 15}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value, 10);
+                    applySettingInstant({ inactivityTimeoutMinutes: val });
+                  }}
+                  className="w-full sm:w-80 bg-[#0F1115] border border-[#1E293B] text-cyan-300 font-bold px-3 py-2 rounded-xl text-xs focus:outline-none focus:border-cyan-500 cursor-pointer"
+                >
+                  <option value={0}>Disabled (Never Auto-Logout)</option>
+                  <option value={5}>5 Minutes of Inactivity</option>
+                  <option value={10}>10 Minutes of Inactivity</option>
+                  <option value={15}>15 Minutes of Inactivity (Recommended)</option>
+                  <option value={30}>30 Minutes of Inactivity</option>
+                  <option value={60}>60 Minutes (1 Hour)</option>
+                </select>
+              </div>
             )}
 
             {/* Backup & Data Maintenance — Store System & Audits pill only */}

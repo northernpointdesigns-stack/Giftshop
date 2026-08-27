@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Clock, Sparkles } from 'lucide-react';
 import { Sidebar } from './components/Sidebar';
 import { TopHeader } from './components/TopHeader';
@@ -10,6 +10,7 @@ import { ConsignmentPayoutReport } from './components/reports/ConsignmentPayoutR
 import { EODBalancing } from './components/reports/EODBalancing';
 import { FinancialReports } from './components/reports/FinancialReports';
 import { ReportDownloads } from './components/reports/ReportDownloads';
+import { VendorSettlementReport } from './components/reports/VendorSettlementReport';
 import { TaxReturnAssistant } from './components/reports/TaxReturnAssistant';
 import { LicenseGate, TrialBadge } from './components/license/LicenseGate';
 import { resolveLicenseState, LicenseState } from './services/license';
@@ -22,6 +23,7 @@ import { QuickRecoveryModal } from './components/admin/QuickRecoveryModal';
 import { DigitalReceiptHub } from './components/customer/DigitalReceiptHub';
 import { VersionUpdateModal } from './components/alerts/VersionUpdateModal';
 import { posDb } from './services/db';
+import { getEffectiveCashierAccess } from './utils/cashierAccess';
 import { InventoryItem, Vendor, Transaction, StaffUser } from './types/pos';
 import { StaffLoginScreen } from './components/auth/StaffLoginScreen';
 import { OpeningFloatGate } from './components/auth/OpeningFloatGate';
@@ -37,7 +39,7 @@ export default function App() {
   const isCustomerWindow = typeof window !== 'undefined' && window.location.search.includes('view=customer');
 
   const [activeTab, setActiveTab] = useState<'pos' | 'inventory' | 'vendors' | 'payouts' | 'reports' | 'invoices' | 'admin'>('pos');
-  const [reportsSubTab, setReportsSubTab] = useState<'eod' | 'pnl' | 'heatmap' | 'forecasting' | 'history' | 'downloads' | 'tax'>('eod');
+    const [reportsSubTab, setReportsSubTab] = useState<'eod' | 'pnl' | 'heatmap' | 'forecasting' | 'history' | 'downloads' | 'tax' | 'vendor_ledger'>('eod');
 
   // Commercial licensing: offline trial countdown / activation gate
   const [licenseState, setLicenseState] = useState<LicenseState>(() => resolveLicenseState());
@@ -66,13 +68,13 @@ export default function App() {
   useEffect(() => {
     document.title = resolveBrandName(settings);
   }, [settings.posAppName, settings.storeName]);
-  const cashierAccess = settings.cashierAccess || {
-    pos: true,
-    inventory: true,
-    reports: true,
-    settings: false,
-    staff: false,
-  };
+  // Per-cashier security gates: resolved for the logged-in staff member
+  // (admin → full access; staff with own gates → those; legacy staff → the
+  // global store map they have always inherited).
+  const cashierAccess = useMemo(
+    () => getEffectiveCashierAccess(currentStaff, settings),
+    [currentStaff, settings]
+  );
 
   const isSubTabAllowed = (subTab: 'eod' | 'pnl' | 'heatmap' | 'forecasting' | 'history' | 'downloads' | 'tax') => {
     if (isAdminLoggedIn) return true;
@@ -598,7 +600,19 @@ export default function App() {
                       : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
-                  Transaction History
+                                  Transaction History
+                </button>
+              )}
+              {isAdminLoggedIn && (
+                <button
+                  onClick={() => setReportsSubTab('vendor_ledger')}
+                  className={`flex-1 py-2 px-3 text-xs font-bold rounded-lg transition-all ${
+                    reportsSubTab === 'vendor_ledger'
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Vendor Ledger
                 </button>
               )}
             </div>
@@ -626,9 +640,14 @@ export default function App() {
                 inventory={inventory}
                 vendors={vendors}
               />
-            ) : reportsSubTab === 'history' ? (
+                        ) : reportsSubTab === 'history' ? (
               <TransactionHistory
                 transactions={transactions}
+                onRefreshData={refreshData}
+              />
+            ) : reportsSubTab === 'vendor_ledger' ? (
+              <VendorSettlementReport
+                vendors={vendors}
                 onRefreshData={refreshData}
               />
             ) : (

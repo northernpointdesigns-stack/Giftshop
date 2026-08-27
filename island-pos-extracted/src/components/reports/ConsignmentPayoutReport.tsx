@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { Vendor, ConsignmentPayoutRecord } from '../../types/pos';
 import { posDb } from '../../services/db';
+import { printVendorPaymentReceipt } from '../../utils/printVendorPaymentReceipt';
 
 interface ConsignmentPayoutReportProps {
   vendors: Vendor[];
@@ -385,10 +386,11 @@ export const ConsignmentPayoutReport: React.FC<ConsignmentPayoutReportProps> = (
                   <div className="pt-2 border-t border-[#1E293B] flex items-center justify-between gap-2 mt-3">
                     <div className="flex gap-2">
                       <button
-                        onClick={() => window.print()}
+                        onClick={() => printVendorPaymentReceipt(posDb.getVendorLedger(vendor.id), settings)}
                         className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5"
+                        title="Print Vendor Audit Statement"
                       >
-                        <Printer className="w-3.5 h-3.5" />
+                        <Printer className="w-3.5 h-3.5 text-cyan-400" />
                         <span>Print Statement</span>
                       </button>
                       <button
@@ -476,6 +478,7 @@ export const ConsignmentPayoutReport: React.FC<ConsignmentPayoutReportProps> = (
                       <th className="p-3">Settlement Date</th>
                       <th className="p-3 text-right">Amount Paid</th>
                       <th className="p-3">Status</th>
+                      <th className="p-3 text-center">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#1E293B]">
@@ -498,6 +501,20 @@ export const ConsignmentPayoutReport: React.FC<ConsignmentPayoutReportProps> = (
                           <span className="bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 px-2 py-0.5 rounded text-[10px] uppercase font-bold">
                             Paid Settled
                           </span>
+                        </td>
+                        <td className="p-3 text-center">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const vLedger = posDb.getVendorLedger(rec.vendorId);
+                              printVendorPaymentReceipt(vLedger, settings, { settlementRecord: rec });
+                            }}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[11px] font-semibold transition-all"
+                            title="Print Payment Receipt Voucher"
+                          >
+                            <Printer className="w-3 h-3" />
+                            <span>Receipt</span>
+                          </button>
                         </td>
                       </tr>
                     ))}
