@@ -382,20 +382,26 @@ export async function verifyLicensePayhip(
       },
       signal,
     });
-    let payload: { data?: { enabled?: boolean; buyer_email?: string } } | null = null;
+    let payload: { data?: { enabled?: boolean; buyer_email?: string } | null; error?: boolean } | null = null;
     try {
       payload = await res.json();
     } catch {
       /* non-JSON body — handled below */
     }
     const data = payload?.data;
-    if (!res.ok || !data) {
+    // Payhip returns HTTP 200 + `{ data: { enabled, buyer_email, ... } }` for a
+    // valid key, and HTTP 400/404 + `{ data: [], error: true }` for a bad one.
+    const notFound =
+      res.status === 400 ||
+      res.status === 404 ||
+      payload?.error === true ||
+      (Array.isArray(data) && data.length === 0);
+    if (!res.ok || !data || notFound) {
       return {
         ok: false,
-        error:
-          res.status === 404
-            ? 'License key not found. Check the key in your Payhip receipt email.'
-            : 'Payhip could not verify this key right now. Please try again in a moment.',
+        error: notFound
+          ? 'License key not found. Check the key in your Payhip receipt email.'
+          : 'Payhip could not verify this key right now. Please try again in a moment.',
       };
     }
     if (!data.enabled) {
