@@ -1,13 +1,18 @@
 node_modules/
 build/
 dist/
+dist-desktop/
 coverage/
 .DS_Store
 *.log
 .env*
 !.env.example
 
-# Locally generated manuals (built via scripts/build_*_manual.py — kept out of git)
+# Local scratch PDFs in project root (official guide lives in docs/)
 /Giftshop_POS_Official_User_Setup_Guide.pdf
 /Island_POS_User_Manual_and_Setup_Guide.pdf
 /Giftshop_POS_Official_User_Setup_Guide copy.pdf
+
+# Keep customer guide in docs/
+!docs/
+!docs/**

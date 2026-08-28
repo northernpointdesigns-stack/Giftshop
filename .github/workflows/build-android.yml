@@ -12,6 +12,8 @@ on:
 # the built APK. Repos without the variable keep the customer trial flow.
 env:
   VITE_DISABLE_LICENSE: ${{ vars.VITE_DISABLE_LICENSE || '0' }}
+  VITE_PURCHASE_URL: ${{ vars.VITE_PURCHASE_URL || secrets.VITE_PURCHASE_URL || '' }}
+  VITE_PAYHIP_PRODUCT_SECRET: ${{ secrets.VITE_PAYHIP_PRODUCT_SECRET || vars.VITE_PAYHIP_PRODUCT_SECRET || '' }}
 
 jobs:
   build-apk:
@@ -29,6 +31,12 @@ jobs:
         working-directory: island-pos-extracted
         run: |
           echo "VITE_DISABLE_LICENSE=$VITE_DISABLE_LICENSE" >> .env.production
+          if [ -n "$VITE_PURCHASE_URL" ]; then
+            echo "VITE_PURCHASE_URL=$VITE_PURCHASE_URL" >> .env.production
+          fi
+          if [ -n "$VITE_PAYHIP_PRODUCT_SECRET" ]; then
+            echo "VITE_PAYHIP_PRODUCT_SECRET=$VITE_PAYHIP_PRODUCT_SECRET" >> .env.production
+          fi
           if [ "$VITE_DISABLE_LICENSE" = "1" ]; then
             echo "UNLOCKED owner build - trial/activation gate disabled"
           else
@@ -66,3 +74,32 @@ jobs:
           name: gift-shop-pos-android-debug
           path: island-pos-extracted/android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
+  docs:
+    name: Customer setup PDF
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: island-pos-extracted
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install reportlab
+        run: pip install reportlab
+
+      - name: Generate customer setup guide PDF
+        run: python3 scripts/build_customer_guide_pdf.py
+
+      - name: Upload setup guide PDF
+        uses: actions/upload-artifact@v4
+        with:
+          name: gift-shop-pos-setup-guide
+          path: island-pos-extracted/docs/Giftshop_POS_Customer_Setup_and_User_Guide.pdf
+          if-no-files-found: error
+

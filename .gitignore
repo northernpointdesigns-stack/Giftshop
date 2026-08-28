@@ -28,3 +28,10 @@ dont touch/
 island-pos-extracted/pos-main/
 oracleJdk-26.jdk/
 islandpos-*.zip
+# Local junk / huge toolchains (never commit)
+dont touch/
+oracleJdk-26.jdk/
+island-pos-extracted/pos-main/
+island-pos-extracted/dist/
+island-pos-extracted/dist-desktop/
+island-pos-extracted/.venv/
