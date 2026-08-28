@@ -706,8 +706,8 @@ export default function App() {
         />
       )}
 
-      {/* Quick Currency & Recovery Modal */}
-      {isQuickRecoveryOpen && (
+      {/* Quick Currency & Recovery Modal — admin-only (parity with SQL Inspector) */}
+      {isQuickRecoveryOpen && isAdminLoggedIn && (
         <QuickRecoveryModal
           onClose={() => setIsQuickRecoveryOpen(false)}
           onRefreshData={refreshData}

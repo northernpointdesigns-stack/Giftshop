@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
-import { Coins, Upload, ShieldCheck, RefreshCw, CheckCircle2, AlertCircle, X, Globe, Lock } from 'lucide-react';
+import { Coins, Upload, ShieldCheck, RefreshCw, CheckCircle2, AlertCircle, X, Globe, Lock, KeyRound } from 'lucide-react';
 import { posDb } from '../../services/db';
+import { soundService } from '../../services/audio';
+
+const MAX_UNLOCK_ATTEMPTS = 5;
 
 interface QuickRecoveryModalProps {
   onClose: () => void;
@@ -36,6 +39,9 @@ export const QuickRecoveryModal: React.FC<QuickRecoveryModalProps> = ({
   const [currencySymbol, setCurrencySymbol] = useState(currentSettings.primaryCurrencySymbol || '$');
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [adminPinInput, setAdminPinInput] = useState('');
+  const [unlockError, setUnlockError] = useState('');
+  const [unlockAttempts, setUnlockAttempts] = useState(0);
 
   const handleSaveCurrency = (code: string, symbol: string) => {
     try {
@@ -51,6 +57,51 @@ export const QuickRecoveryModal: React.FC<QuickRecoveryModalProps> = ({
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to update currency');
     }
+  };
+
+  /**
+   * Admin recovery unlock — replaces the former one-click grant.
+   * Requires the active administrator's PIN (role === 'admin' only; senior
+   * cashiers cannot authorize a full admin session), rate-limits attempts,
+   * and writes an immutable entry to the security audit trail.
+   */
+  const handleAdminUnlock = () => {
+    if (unlockAttempts >= MAX_UNLOCK_ATTEMPTS) return;
+    const pin = adminPinInput.trim();
+    if (!pin) {
+      setUnlockError('Enter the administrator PIN to continue.');
+      return;
+    }
+    const admin = posDb
+      .getStaffUsers()
+      .find((u) => u.role === 'admin' && u.status === 'active' && u.pin === pin);
+    if (!admin) {
+      soundService.playErrorBeep();
+      const next = unlockAttempts + 1;
+      setUnlockAttempts(next);
+      setAdminPinInput('');
+      setUnlockError(
+        next >= MAX_UNLOCK_ATTEMPTS
+          ? 'Too many failed attempts. Admin unlock is disabled for this session — log out and sign in with the administrator account instead.'
+          : `Invalid administrator PIN. ${MAX_UNLOCK_ATTEMPTS - next} attempt${MAX_UNLOCK_ATTEMPTS - next === 1 ? '' : 's'} remaining.`
+      );
+      return;
+    }
+    posDb.pushAuditEntry({
+      user: admin.name,
+      action: 'admin_unlock',
+      entityType: 'transaction',
+      entityId: 'ADMIN-SESSION-GRANT',
+      entityLabel: 'Recovery modal admin session grant',
+      newValue: 'Admin session granted after PIN verification',
+      reason: 'Admin access restored via Currency & Recovery modal',
+    });
+    soundService.playBeep();
+    setSuccessMsg(`Admin access granted (PIN verified: ${admin.name}). This unlock has been recorded in the security audit log.`);
+    setTimeout(() => setSuccessMsg(''), 5000);
+    onGrantAdmin();
+    setAdminPinInput('');
+    setUnlockError('');
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -222,7 +273,7 @@ export const QuickRecoveryModal: React.FC<QuickRecoveryModalProps> = ({
           </div>
         </div>
 
-        {/* Section 3: Admin Access Recovery */}
+        {/* Section 3: Admin Access Recovery — PIN-gated, rate-limited, audited */}
         {!isAdminLoggedIn && (
           <div className="space-y-3 bg-[#0D1117] p-4 rounded-xl border border-[#30363D]">
             <div className="flex items-center justify-between">
@@ -231,18 +282,44 @@ export const QuickRecoveryModal: React.FC<QuickRecoveryModalProps> = ({
               </label>
             </div>
             <p className="text-xs text-slate-400">
-              Locked out of admin settings? Click below to instantly grant admin privileges for this session.
+              Locked out of admin settings? Enter the <strong className="text-slate-300">administrator PIN</strong> to restore admin privileges for this session. Every unlock is verified and recorded in the tamper-proof security audit log.
             </p>
-            <button
-              onClick={() => {
-                onGrantAdmin();
-                setSuccessMsg('Admin access granted successfully!');
-                setTimeout(() => setSuccessMsg(''), 3000);
-              }}
-              className="w-full py-2.5 px-4 rounded-xl bg-amber-600/20 border border-amber-500/30 text-amber-300 hover:bg-amber-600/30 font-bold text-xs transition-all flex items-center justify-center gap-2"
-            >
-              <ShieldCheck className="w-4 h-4" /> Grant Admin Access Now
-            </button>
+            {unlockAttempts < MAX_UNLOCK_ATTEMPTS ? (
+              <div className="space-y-2">
+                <div className="flex items-stretch gap-2">
+                  <div className="relative flex-1">
+                    <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                    <input
+                      type="password"
+                      value={adminPinInput}
+                      onChange={(e) => { setAdminPinInput(e.target.value); setUnlockError(''); }}
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleAdminUnlock(); }}
+                      placeholder="Administrator PIN"
+                      autoComplete="off"
+                      className="w-full py-2.5 pl-9 pr-3 rounded-xl bg-[#0F1115] border border-[#1E293B] text-slate-100 text-xs font-mono focus:outline-none focus:border-amber-500/60"
+                    />
+                  </div>
+                  <button
+                    onClick={handleAdminUnlock}
+                    className="py-2.5 px-4 rounded-xl bg-amber-600/20 border border-amber-500/30 text-amber-300 hover:bg-amber-600/30 font-bold text-xs transition-all flex items-center justify-center gap-2 whitespace-nowrap"
+                  >
+                    <ShieldCheck className="w-4 h-4" /> Verify &amp; Grant
+                  </button>
+                </div>
+                {unlockError && (
+                  <p className="text-[11px] text-rose-300 flex items-center gap-1.5">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" /> {unlockError}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-start gap-2 bg-rose-500/10 border border-rose-500/30 rounded-xl p-3">
+                <Lock className="w-4 h-4 text-rose-300 shrink-0 mt-0.5" />
+                <p className="text-[11px] text-rose-200">
+                  Unlock disabled after {MAX_UNLOCK_ATTEMPTS} failed attempts. Please log out and sign in with the administrator account to regain access.
+                </p>
+              </div>
+            )}
           </div>
         )}
 
