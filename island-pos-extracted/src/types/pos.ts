@@ -176,7 +176,8 @@ export type AuditAction =
   | 'void'
   | 'vendor_advance'
   | 'vendor_payout'
-  | 'admin_unlock';
+  | 'admin_unlock'
+  | 'admin_pin_change';
 
 /**
  * One immutable record in the store's audit / exception trail. Entries are

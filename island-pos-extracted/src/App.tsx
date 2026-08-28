@@ -393,7 +393,7 @@ export default function App() {
     return (
       <StaffLoginScreen
         storeName={resolveStoreName(settings)}
-        onOpenWelcomeSetup={() => setIsOnboardingModalOpen(true)}
+        onOpenWelcomeSetup={settings.onboardingCompleted ? undefined : () => setIsOnboardingModalOpen(true)}
         onAuthenticated={(staff) => {
           setCurrentStaff(staff);
           setIsAdminLoggedIn(staff.role === 'admin');

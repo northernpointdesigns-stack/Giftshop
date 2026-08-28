@@ -41,6 +41,9 @@ export const WelcomeOnboardingModal: React.FC<WelcomeOnboardingModalProps> = ({
   const [newPin, setNewPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  // Replay-mode guard: re-running setup after initial configuration requires
+  // proving knowledge of the CURRENT admin PIN before credentials can change.
+  const [replayAdminPin, setReplayAdminPin] = useState('');
   const [step1Error, setStep1Error] = useState('');
   const [savedStaffUser, setSavedStaffUser] = useState<StaffUser | null>(null);
 
@@ -69,6 +72,17 @@ export const WelcomeOnboardingModal: React.FC<WelcomeOnboardingModalProps> = ({
   const handleStep1Submit = (keepDefault: boolean = false) => {
     setStep1Error('');
 
+    // Replay-mode guard: this wizard can only touch credentials after the
+    // CURRENT admin PIN is proven - blocks unauthorized takeover via the
+    // login screen's First Time Setup entry point.
+    if (isReplayMode) {
+      const expectedPin = settings.adminPin || 'admin123';
+      if (replayAdminPin.trim() !== expectedPin) {
+        setStep1Error('Enter the current Admin PIN to re-run setup. Unauthorized credential changes are blocked.');
+        return;
+      }
+    }
+
     let finalPin = settings.adminPin || 'admin123';
     let finalUsername = adminUsername.trim() || 'admin';
 
@@ -94,6 +108,23 @@ export const WelcomeOnboardingModal: React.FC<WelcomeOnboardingModalProps> = ({
       newAdminUsername: finalUsername,
       storeName: storeName.trim() || 'My Boutique',
     });
+
+    // Replay-mode credential changes are recorded in the tamper-proof audit trail.
+    if (isReplayMode) {
+      try {
+        posDb.pushAuditEntry({
+          user: 'Setup Wizard Replay (current PIN verified)',
+          action: 'admin_pin_change',
+          entityType: 'transaction',
+          entityId: 'ADMIN-CREDENTIALS',
+          entityLabel: 'Admin credentials via Welcome Wizard replay',
+          newValue: keepDefault ? 'Credentials kept unchanged' : 'Admin PIN updated',
+          reason: 'Welcome wizard re-run; current admin PIN verified before change',
+        });
+      } catch {
+        /* audit is best-effort; never block onboarding */
+      }
+    }
 
     setSavedStaffUser(adminUser);
     setCurrentStep(2);
@@ -230,6 +261,30 @@ export const WelcomeOnboardingModal: React.FC<WelcomeOnboardingModalProps> = ({
                 🔒 <strong>Recommendation:</strong> Create your own secure Master PIN / Password below to protect register controls, financial reports, and settings.
               </p>
             </div>
+
+            {/* Replay-mode identity check: current admin PIN required */}
+            {isReplayMode && (
+              <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-4 space-y-2.5">
+                <div className="flex items-center gap-2 text-rose-300 font-bold text-xs uppercase tracking-wide">
+                  <ShieldAlert className="w-4 h-4 shrink-0" />
+                  <span>Security Verification Required</span>
+                </div>
+                <p className="text-[11px] text-slate-300 leading-relaxed">
+                  This store is already set up. To re-run the wizard (or change the Master PIN), enter the <strong className="text-slate-200">current Admin PIN</strong>. Every change is recorded in the security audit log.
+                </p>
+                <input
+                  type="password"
+                  value={replayAdminPin}
+                  onChange={(e) => {
+                    setReplayAdminPin(e.target.value);
+                    setStep1Error('');
+                  }}
+                  placeholder="Current Admin PIN"
+                  autoComplete="off"
+                  className="w-full bg-[#0F1115] border border-[#1E293B] rounded-xl px-3 py-2 text-xs font-mono font-bold text-white focus:outline-none focus:border-rose-500/60"
+                />
+              </div>
+            )}
 
             {/* Store & New Password Form */}
             <div className="space-y-3.5 bg-[#0F1115] border border-[#1E293B] p-4 rounded-xl">
