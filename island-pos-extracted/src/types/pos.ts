@@ -177,7 +177,9 @@ export type AuditAction =
   | 'vendor_advance'
   | 'vendor_payout'
   | 'admin_unlock'
-  | 'admin_pin_change';
+  | 'admin_pin_change'
+  | 'admin_pin_reset'
+  | 'master_reset_password_change';
 
 /**
  * One immutable record in the store's audit / exception trail. Entries are
@@ -350,6 +352,13 @@ export interface StoreSettings {
   taxRegistrationNumber?: string;
   adminUsername?: string;
   adminPin?: string;
+  /**
+   * Separate backup secret used only to recover a forgotten admin PIN.
+   * Configured in Admin → Store System & Audits. Empty/unset = recovery disabled.
+   */
+  masterResetPassword?: string;
+  /** True after a master-reset recovery until the admin changes away from the temporary default PIN. */
+  adminPinMustChange?: boolean;
   exchangeRateUpdatedAt?: string; // ISO timestamp of the last daily-rate confirmation
 
   // Custom Corporate Branding Config

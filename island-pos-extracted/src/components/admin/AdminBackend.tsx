@@ -333,6 +333,14 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
   const [whatsAppTestLog, setWhatsAppTestLog] = useState<string[]>([]);
   const [isAutoBackupModalOpen, setIsAutoBackupModalOpen] = useState(false);
 
+  // Master Reset Password (backup recovery secret) — never bound to the live stored value
+  const [masterResetConfigured, setMasterResetConfigured] = useState(() => posDb.hasMasterResetPassword());
+  const [masterResetNew, setMasterResetNew] = useState('');
+  const [masterResetConfirm, setMasterResetConfirm] = useState('');
+  const [masterResetAdminPin, setMasterResetAdminPin] = useState('');
+  const [masterResetError, setMasterResetError] = useState('');
+  const [masterResetSuccess, setMasterResetSuccess] = useState('');
+
   // Camera Capture for Logo State & Handlers
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
@@ -434,6 +442,7 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
 
     const currSettings = posDb.getSettings();
     setSettings(currSettings);
+    setMasterResetConfigured(posDb.hasMasterResetPassword());
     setHeaderLinesText((currSettings.receiptHeaderLines || []).join('\n'));
     setFooterLinesText((currSettings.receiptFooterLines || []).join('\n'));
 
@@ -809,16 +818,53 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
   // Store Settings Handler
   const handleSaveStoreSettings = (e: React.FormEvent) => {
     e.preventDefault();
+    // Never overwrite masterResetPassword from this form — it is managed only via setMasterResetPassword.
+    const { masterResetPassword: _omitMaster, ...rest } = settings;
     const settingsToSave = {
-      ...settings,
+      ...rest,
       onboardingCompleted: true,
     };
     posDb.updateSettings(settingsToSave);
     const updated = posDb.getSettings();
     setSettings(updated);
+    setMasterResetConfigured(posDb.hasMasterResetPassword());
     onRefreshData(); // Instantly update currency & branding settings across application
     setSettingsSuccessMsg('Store Settings & Admin Passwords saved successfully!');
     setTimeout(() => setSettingsSuccessMsg(''), 3000);
+  };
+
+  /** Save / clear the Master Reset Password (lockout recovery secret). */
+  const handleSaveMasterResetPassword = () => {
+    setMasterResetError('');
+    setMasterResetSuccess('');
+
+    if (!masterResetAdminPin.trim()) {
+      setMasterResetError('Enter your current Admin PIN to change the Master Reset Password.');
+      return;
+    }
+
+    // Confirm only required when setting a new non-empty password
+    if (masterResetNew.trim() && masterResetNew.trim() !== masterResetConfirm.trim()) {
+      setMasterResetError('New Master Reset Password and confirmation do not match.');
+      return;
+    }
+
+    const result = posDb.setMasterResetPassword(masterResetNew, masterResetAdminPin);
+    if (!result.ok) {
+      setMasterResetError(result.error || 'Could not update Master Reset Password.');
+      return;
+    }
+
+    setMasterResetConfigured(posDb.hasMasterResetPassword());
+    setMasterResetNew('');
+    setMasterResetConfirm('');
+    setMasterResetAdminPin('');
+    setMasterResetSuccess(
+      masterResetNew.trim()
+        ? 'Master Reset Password saved. Store it offline — it is the only way to recover a forgotten Admin PIN.'
+        : 'Master Reset Password cleared. Login recovery is now disabled until you set a new one.'
+    );
+    setTimeout(() => setMasterResetSuccess(''), 5000);
   };
 
   // Receipt Customization Handlers
@@ -4939,6 +4985,81 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
                     onChange={(e) => setSettings({ ...settings, adminPin: e.target.value })}
                     className="w-full bg-[#0F1115] border border-[#1E293B] rounded-xl px-3.5 py-2 text-xs font-mono text-[#E2E8F0] focus:outline-none focus:border-cyan-500"
                   />
+                </div>
+              </div>
+
+              {/* Master Reset Password — lockout recovery backup */}
+              <div className="bg-rose-500/5 border border-rose-500/25 rounded-xl p-4 space-y-3 mt-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Lock className="w-4 h-4 text-rose-300 shrink-0" />
+                    <h4 className="text-xs font-bold text-rose-200 uppercase tracking-wide">
+                      Master Reset Password (Backup)
+                    </h4>
+                  </div>
+                  <span
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                      masterResetConfigured
+                        ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40'
+                        : 'bg-slate-800 text-slate-400 border-slate-600'
+                    }`}
+                  >
+                    {masterResetConfigured ? 'Configured — recovery available' : 'Not set — lockout recovery unavailable'}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  If you forget the Admin login PIN, use this on the staff login screen. It resets Admin PIN to temporary default <code className="text-amber-300 font-mono">admin123</code> (change it right after sign-in). Leave new password blank and save to clear. Never shown again after saving.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-300 mb-1">New Master Reset Password</label>
+                    <input
+                      type="password"
+                      value={masterResetNew}
+                      onChange={(e) => { setMasterResetNew(e.target.value); setMasterResetError(''); }}
+                      placeholder={masterResetConfigured ? 'New (blank = clear)' : 'Min. 6 characters'}
+                      autoComplete="new-password"
+                      className="w-full bg-[#0F1115] border border-[#1E293B] rounded-xl px-3 py-2 text-xs font-mono text-[#E2E8F0] focus:outline-none focus:border-rose-500/60"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-300 mb-1">Confirm</label>
+                    <input
+                      type="password"
+                      value={masterResetConfirm}
+                      onChange={(e) => { setMasterResetConfirm(e.target.value); setMasterResetError(''); }}
+                      placeholder="Re-enter to confirm"
+                      autoComplete="new-password"
+                      className="w-full bg-[#0F1115] border border-[#1E293B] rounded-xl px-3 py-2 text-xs font-mono text-[#E2E8F0] focus:outline-none focus:border-rose-500/60"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-300 mb-1">Current Admin PIN</label>
+                    <input
+                      type="password"
+                      value={masterResetAdminPin}
+                      onChange={(e) => { setMasterResetAdminPin(e.target.value); setMasterResetError(''); }}
+                      placeholder="Required to save"
+                      autoComplete="off"
+                      className="w-full bg-[#0F1115] border border-[#1E293B] rounded-xl px-3 py-2 text-xs font-mono text-[#E2E8F0] focus:outline-none focus:border-rose-500/60"
+                    />
+                  </div>
+                </div>
+                {masterResetError && (
+                  <p className="text-[11px] text-rose-300 bg-rose-950/40 border border-rose-800/50 rounded-lg px-3 py-2">{masterResetError}</p>
+                )}
+                {masterResetSuccess && (
+                  <p className="text-[11px] text-emerald-300 bg-emerald-950/40 border border-emerald-800/50 rounded-lg px-3 py-2">{masterResetSuccess}</p>
+                )}
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={handleSaveMasterResetPassword}
+                    className="bg-rose-600/80 hover:bg-rose-500 text-white font-bold px-4 py-2 rounded-xl text-xs shadow-md flex items-center gap-2 transition-colors"
+                  >
+                    <Key className="w-3.5 h-3.5" />
+                    <span>{masterResetNew.trim() ? 'Save Master Reset Password' : masterResetConfigured ? 'Clear Master Reset Password' : 'Save Master Reset Password'}</span>
+                  </button>
                 </div>
               </div>
             </div>

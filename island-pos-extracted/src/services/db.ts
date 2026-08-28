@@ -765,6 +765,10 @@ class PosDatabase {
   public updateSettings(newSettings: Partial<StoreSettings>) {
     if (newSettings.adminPin && newSettings.adminPin !== 'admin123') {
       newSettings.onboardingCompleted = true;
+      // Changing away from the temporary default clears the post-recovery force-change flag.
+      if (newSettings.adminPinMustChange === undefined) {
+        newSettings.adminPinMustChange = false;
+      }
     }
     this.settings = { ...this.settings, ...newSettings };
     this.saveSettings();
@@ -2005,6 +2009,111 @@ class PosDatabase {
     return this.staffUsers.find((user) => user.status === 'active' && user.pin === cleanPin);
   }
 
+  /** True when a non-empty master reset password has been configured. */
+  public hasMasterResetPassword(): boolean {
+    return Boolean((this.settings.masterResetPassword || '').trim());
+  }
+
+  /**
+   * Configure or clear the master reset password (Admin → Store System & Audits).
+   * Requires the current admin PIN. Does not change the day-to-day admin login PIN.
+   */
+  public setMasterResetPassword(
+    newPassword: string,
+    currentAdminPin: string
+  ): { ok: boolean; error?: string } {
+    const expectedPin = (this.settings.adminPin || 'admin123').trim();
+    if (currentAdminPin.trim() !== expectedPin) {
+      return { ok: false, error: 'Current Admin PIN is incorrect.' };
+    }
+
+    const cleaned = newPassword.trim();
+    // Empty string clears the recovery secret (disables login recovery).
+    if (cleaned.length > 0 && cleaned.length < 6) {
+      return { ok: false, error: 'Master Reset Password must be at least 6 characters.' };
+    }
+    if (cleaned && cleaned === expectedPin) {
+      return {
+        ok: false,
+        error: 'Master Reset Password must be different from the Admin login PIN.',
+      };
+    }
+
+    const previousConfigured = this.hasMasterResetPassword();
+    this.settings = {
+      ...this.settings,
+      masterResetPassword: cleaned || undefined,
+    };
+    this.saveSettings();
+
+    try {
+      this.pushAuditEntry({
+        user: this.settings.adminUsername || 'admin',
+        action: 'master_reset_password_change',
+        entityType: 'transaction',
+        entityId: 'MASTER-RESET-PASSWORD',
+        entityLabel: 'Master Reset Password',
+        originalValue: previousConfigured ? 'Configured' : 'Not set',
+        newValue: cleaned ? 'Configured' : 'Cleared',
+        reason: cleaned
+          ? 'Master reset password set/updated in Store System & Audits'
+          : 'Master reset password cleared — login recovery disabled',
+      });
+    } catch {
+      /* audit is best-effort */
+    }
+
+    return { ok: true };
+  }
+
+  /**
+   * Login lockout recovery: verify master reset password, then reset the admin
+   * PIN to the temporary default (admin123). Owner must change it after sign-in.
+   */
+  public resetAdminPinViaMasterReset(
+    masterResetInput: string
+  ): { ok: boolean; error?: string; temporaryPin?: string } {
+    const stored = (this.settings.masterResetPassword || '').trim();
+    if (!stored) {
+      return {
+        ok: false,
+        error: 'Master Reset Password is not configured. An administrator must set it under Store System & Audits while logged in.',
+      };
+    }
+    if (masterResetInput.trim() !== stored) {
+      return { ok: false, error: 'Incorrect Master Reset Password.' };
+    }
+
+    const TEMPORARY_PIN = 'admin123';
+    const previousPinHint = this.settings.adminPin ? 'custom' : 'default';
+
+    this.settings = {
+      ...this.settings,
+      adminPin: TEMPORARY_PIN,
+      adminPinMustChange: true,
+      onboardingCompleted: true,
+    };
+    this.saveSettings();
+    this.syncAdminStaffUser(TEMPORARY_PIN, this.settings.adminUsername);
+
+    try {
+      this.pushAuditEntry({
+        user: 'Master Reset (login recovery)',
+        action: 'admin_pin_reset',
+        entityType: 'transaction',
+        entityId: 'ADMIN-PIN-RESET',
+        entityLabel: 'Admin PIN recovered via Master Reset Password',
+        originalValue: previousPinHint === 'custom' ? 'Previous custom PIN' : 'Previous PIN',
+        newValue: 'Temporary default admin123 (must change after login)',
+        reason: 'Forgotten admin PIN recovered at staff login using master reset password',
+      });
+    } catch {
+      /* audit is best-effort */
+    }
+
+    return { ok: true, temporaryPin: TEMPORARY_PIN };
+  }
+
   public addStaffUser(user: Omit<StaffUser, 'id' | 'createdAt'>): StaffUser {
     const newUser: StaffUser = {
       ...user,
@@ -2029,6 +2138,7 @@ class PosDatabase {
           settingUpdates.adminPin = updates.pin;
           if (updates.pin !== 'admin123') {
             settingUpdates.onboardingCompleted = true;
+            settingUpdates.adminPinMustChange = false;
           }
         }
         if (updates.username) {
