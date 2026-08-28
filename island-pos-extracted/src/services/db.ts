@@ -611,6 +611,17 @@ class PosDatabase {
       let data: any = null;
       try {
         data = JSON.parse(content);
+        // Backward compatibility: older auto-downloaded EOD backups were double
+        // encoded (JSON.stringify applied to an already-serialized string). If
+        // the first parse yields a string, unwrap it once so those legacy files
+        // restore instead of failing with "root must be an object".
+        if (typeof data === 'string') {
+          try {
+            data = JSON.parse(data);
+          } catch {
+            // Keep as the string value; the object check below gives a clear error.
+          }
+        }
       } catch (jsonErr) {
         // If not valid JSON, check if it's a legacy SQL text dump
         if (trimmed.includes('INSERT INTO') || trimmed.includes('store_settings')) {

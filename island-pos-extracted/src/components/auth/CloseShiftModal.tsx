@@ -189,7 +189,10 @@ export const CloseShiftModal: React.FC<CloseShiftModalProps> = ({
       try {
         const dateStr = new Date().toISOString().split('T')[0];
         const jsonDump = posDb.exportBackup();
-        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(jsonDump, null, 2));
+        // exportBackup() already returns a JSON-serialized string. Do NOT
+        // JSON.stringify it again — that double-encodes the payload and makes
+        // the downloaded file un-restorable ("root must be an object").
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(jsonDump);
         const downloadAnchor = document.createElement('a');
         downloadAnchor.setAttribute("href", dataStr);
         downloadAnchor.setAttribute("download", `boutique-pos-backup-${dateStr}.json`);

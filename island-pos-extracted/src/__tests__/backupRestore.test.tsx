@@ -109,4 +109,48 @@ describe('backup/restore round-trip (till-close .db dump)', () => {
     expect(res.ok).toBe(false);
     expect(res.error).toMatch(/binary|json/i);
   });
+
+  it('a legacy double-encoded EOD auto-backup restores in full (CloseShiftModal bug)', () => {
+    // CloseShiftModal used to write JSON.stringify(exportBackup(), null, 2) — i.e.
+    // a JSON-encoded *string* instead of an object. importBackup() must unwrap
+    // these legacy files so previously-downloaded EOD backups are restorable.
+    const payload = {
+      app: 'The Gift Shop POS',
+      exportedAt: new Date().toISOString(),
+      vendors: VENDORS,
+      inventory: INVENTORY,
+      transactions: TRANSACTIONS,
+      payouts: [],
+      settings: SETTINGS,
+    };
+    const singleEncoded = JSON.stringify(payload, null, 2);
+    const doubleEncoded = JSON.stringify(singleEncoded, null, 2);
+
+    posDb.resetToDefault();
+    const res = posDb.importBackup(doubleEncoded);
+    expect(res.ok).toBe(true);
+    expect(posDb.getTransactions().length).toBe(TRANSACTIONS.length);
+    expect(posDb.getInventory().length).toBe(INVENTORY.length);
+  });
+
+  it('the auto EOD download payload (single-encoded) round-trips through importBackup', () => {
+    // Mirror exactly what exportBackup() returns (a JSON-serialized string) and
+    // what CloseShiftModal now writes after the fix — never double-encoded.
+    const payload = {
+      app: 'The Gift Shop POS',
+      exportedAt: new Date().toISOString(),
+      vendors: VENDORS,
+      inventory: INVENTORY,
+      transactions: TRANSACTIONS,
+      payouts: [],
+      settings: { ...(SETTINGS as any), storeName: 'Round-Trip Gift Shop' },
+    };
+    const singleEncoded = JSON.stringify(payload, null, 2);
+
+    posDb.resetToDefault();
+    const res = posDb.importBackup(singleEncoded);
+    expect(res.ok).toBe(true);
+    expect(posDb.getTransactions().length).toBe(TRANSACTIONS.length);
+    expect(posDb.getSettings().storeName).toBe('Round-Trip Gift Shop');
+  });
 });
