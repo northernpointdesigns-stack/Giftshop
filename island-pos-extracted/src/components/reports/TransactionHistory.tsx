@@ -138,7 +138,12 @@ export const TransactionHistory: React.FC<TransactionHistoryProps> = ({
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-[#1E293B] pb-3">
           <div className="flex items-center gap-2">
             <FileText className="w-5 h-5 text-emerald-400" />
-            <h2 className="text-lg font-bold text-[#E2E8F0]">Transaction & Receipt Audit Ledger</h2>
+            <div>
+              <h2 className="text-lg font-bold text-[#E2E8F0]">Transaction & Receipt Audit Ledger</h2>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                Register receipts by date — search, reprint, and integrity check. Sales live here; the security audit log is for exceptions (refunds, stock edits, PIN changes), not every sale.
+              </p>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <span className="bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 px-2.5 py-1 rounded-lg text-xs font-bold font-mono flex items-center gap-1.5">

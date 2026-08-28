@@ -33,7 +33,24 @@ interface FinancialReportsProps {
 export const FinancialReports: React.FC<FinancialReportsProps> = ({
   transactions,
 }) => {
-  const [cycle, setCycle] = useState<'today' | 'week' | 'month' | 'year' | 'all'>('today');
+  type CycleMode = 'today' | 'week' | 'month' | 'year' | 'all' | 'custom' | 'pick_month' | 'pick_year';
+
+  const localDateKey = (d = new Date()) => {
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${d.getFullYear()}-${m}-${day}`;
+  };
+  const todayKey = localDateKey();
+  const currentMonthKey = todayKey.slice(0, 7); // YYYY-MM
+  const currentYearKey = String(new Date().getFullYear());
+
+  // Default to this month so graphs have a useful window (not empty "today" only).
+  const [cycle, setCycle] = useState<CycleMode>('month');
+  const [customFrom, setCustomFrom] = useState(todayKey);
+  const [customTo, setCustomTo] = useState(todayKey);
+  const [pickMonth, setPickMonth] = useState(currentMonthKey);
+  const [pickYear, setPickYear] = useState(currentYearKey);
+
   const [viewMode, setViewModeState] = useState<'numbers' | 'graphs' | 'pie'>(() => {
     try {
       const saved = localStorage.getItem('finreports.viewMode');
@@ -53,31 +70,76 @@ export const FinancialReports: React.FC<FinancialReportsProps> = ({
 
   const settings = posDb.getSettings();
   const primarySymbol = settings.primaryCurrencySymbol || '$';
-;
   const primaryCode = settings.primaryCurrency || 'USD';
   const secondarySymbol = settings.secondaryCurrencySymbol || '$';
   const secondaryCode = settings.secondaryCurrency || 'USD';
   const exchangeRate = settings.exchangeRate || 1;
 
-  // Filter transactions by selected report cycle
-  const now = new Date();
-  const filteredTx = transactions.filter((tx) => {
-    const txDate = new Date(tx.timestamp);
+  // Inclusive local-date bounds for the active period (null = unbounded).
+  const periodBounds = (() => {
+    const now = new Date();
+    const startOfLocalDay = (isoDate: string) => {
+      const [y, m, d] = isoDate.split('-').map(Number);
+      return new Date(y, m - 1, d, 0, 0, 0, 0);
+    };
+    const endOfLocalDay = (isoDate: string) => {
+      const [y, m, d] = isoDate.split('-').map(Number);
+      return new Date(y, m - 1, d, 23, 59, 59, 999);
+    };
+
     if (cycle === 'today') {
-      return txDate.toDateString() === now.toDateString();
+      return { from: startOfLocalDay(todayKey), to: endOfLocalDay(todayKey), label: `Daily · ${todayKey}` };
     }
     if (cycle === 'week') {
-      const sevenDaysAgo = new Date(now.getTime() - 7 * 86400000);
-      return txDate >= sevenDaysAgo;
+      const from = new Date(now.getTime() - 6 * 86400000);
+      from.setHours(0, 0, 0, 0);
+      return { from, to: endOfLocalDay(todayKey), label: 'Last 7 days' };
     }
     if (cycle === 'month') {
-      return txDate.getMonth() === now.getMonth() && txDate.getFullYear() === now.getFullYear();
+      const from = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+      const to = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+      return {
+        from,
+        to,
+        label: `This month · ${now.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}`,
+      };
     }
     if (cycle === 'year') {
-      return txDate.getFullYear() === now.getFullYear();
+      const from = new Date(now.getFullYear(), 0, 1, 0, 0, 0, 0);
+      const to = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
+      return { from, to, label: `This year · ${now.getFullYear()}` };
     }
+    if (cycle === 'custom') {
+      const a = customFrom <= customTo ? customFrom : customTo;
+      const b = customFrom <= customTo ? customTo : customFrom;
+      return { from: startOfLocalDay(a), to: endOfLocalDay(b), label: `${a} → ${b}` };
+    }
+    if (cycle === 'pick_month') {
+      const [y, m] = pickMonth.split('-').map(Number);
+      const from = new Date(y, m - 1, 1, 0, 0, 0, 0);
+      const to = new Date(y, m, 0, 23, 59, 59, 999);
+      const label = from.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+      return { from, to, label: `Month · ${label}` };
+    }
+    if (cycle === 'pick_year') {
+      const y = Number(pickYear) || now.getFullYear();
+      const from = new Date(y, 0, 1, 0, 0, 0, 0);
+      const to = new Date(y, 11, 31, 23, 59, 59, 999);
+      return { from, to, label: `Year · ${y}` };
+    }
+    // all
+    return { from: null as Date | null, to: null as Date | null, label: 'All time' };
+  })();
+
+  const filteredTx = transactions.filter((tx) => {
+    const txDate = new Date(tx.timestamp);
+    if (periodBounds.from && txDate < periodBounds.from) return false;
+    if (periodBounds.to && txDate > periodBounds.to) return false;
     return true;
   });
+
+  const cycleLabel = periodBounds.label;
+  const cycleTag = cycle.toUpperCase().replace('_', ' ');
 
   // Calculate Key Metrics
   let grossSales = 0;
@@ -229,14 +291,20 @@ export const FinancialReports: React.FC<FinancialReportsProps> = ({
 
   const revenueSeries: ChartPoint[] = (() => {
     const buckets = new Map<string, { t: number; v: number }>();
+    const useHourly = cycle === 'today' || (cycle === 'custom' && customFrom === customTo);
+    const useMonthly =
+      cycle === 'year' ||
+      cycle === 'all' ||
+      cycle === 'pick_year' ||
+      (cycle === 'custom' && customFrom !== customTo && (new Date(customTo).getTime() - new Date(customFrom).getTime()) > 60 * 86400000);
+
     filteredTx.forEach((tx) => {
       const d = new Date(tx.timestamp);
-      const k =
-        cycle === 'today'
-          ? `${String(d.getHours()).padStart(2, '0')}:00`
-          : cycle === 'year' || cycle === 'all'
-            ? d.toLocaleDateString(undefined, { month: 'short', year: '2-digit' })
-            : d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+      const k = useHourly
+        ? `${String(d.getHours()).padStart(2, '0')}:00`
+        : useMonthly
+          ? d.toLocaleDateString(undefined, { month: 'short', year: '2-digit' })
+          : d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
       const b = buckets.get(k) || { t: d.getTime(), v: 0 };
       b.v += tx.total;
       b.t = Math.min(b.t, d.getTime());
@@ -264,7 +332,7 @@ export const FinancialReports: React.FC<FinancialReportsProps> = ({
 
   // Export CSV Report for Selected Cycle
   const handleExportCsv = () => {
-    let csvStr = `Cycle Financial Performance Report (${cycle.toUpperCase()})\n`;
+    let csvStr = `Cycle Financial Performance Report (${cycleTag}) — ${cycleLabel}\n`;
     csvStr += `Generated At,${new Date().toLocaleString()}\n`;
     csvStr += `Blended Exchange Rate (at time of sale),1 ${secondaryCode} = ${primarySymbol} ${fxRate.toFixed(2)}\n\n`;
 
@@ -324,53 +392,39 @@ export const FinancialReports: React.FC<FinancialReportsProps> = ({
             <TrendingUp className="w-5 h-5 text-emerald-400" /> Executive Financial & Brand Audit
           </h2>
           <p className="text-xs text-slate-400 mt-0.5">
-            Automated cycle performance (Daily EOD, Monthly, Yearly), VAT collection, and Brand matrix
+            P&amp;L by day, week, month, year or custom dates — VAT, profit and brand matrix from register receipts
+          </p>
+          <p className="text-[11px] text-emerald-400/90 mt-1 font-semibold">
+            Period: {cycleLabel} · {filteredTx.length} transaction{filteredTx.length === 1 ? '' : 's'}
           </p>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
           {/* Cycle Toggles */}
-          <div className="flex bg-[#0F1115] p-1 rounded-xl border border-[#1E293B] text-xs font-medium">
-            <button
-              onClick={() => setCycle('today')}
-              className={`px-3 py-1 rounded-lg transition-colors flex items-center gap-1 ${
-                cycle === 'today' ? 'bg-emerald-600 text-white font-bold' : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <Calendar className="w-3 h-3" /> Daily (EOD)
-            </button>
-            <button
-              onClick={() => setCycle('week')}
-              className={`px-3 py-1 rounded-lg transition-colors ${
-                cycle === 'week' ? 'bg-emerald-600 text-white font-bold' : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              This Week
-            </button>
-            <button
-              onClick={() => setCycle('month')}
-              className={`px-3 py-1 rounded-lg transition-colors ${
-                cycle === 'month' ? 'bg-emerald-600 text-white font-bold' : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              This Month
-            </button>
-            <button
-              onClick={() => setCycle('year')}
-              className={`px-3 py-1 rounded-lg transition-colors ${
-                cycle === 'year' ? 'bg-emerald-600 text-white font-bold' : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              This Year
-            </button>
-            <button
-              onClick={() => setCycle('all')}
-              className={`px-3 py-1 rounded-lg transition-colors ${
-                cycle === 'all' ? 'bg-emerald-600 text-white font-bold' : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              All Time
-            </button>
+          <div className="flex flex-wrap bg-[#0F1115] p-1 rounded-xl border border-[#1E293B] text-xs font-medium gap-0.5">
+            {(
+              [
+                ['today', 'Daily (EOD)'],
+                ['week', 'This Week'],
+                ['month', 'This Month'],
+                ['year', 'This Year'],
+                ['all', 'All Time'],
+                ['custom', 'Date range'],
+                ['pick_month', 'By month'],
+                ['pick_year', 'By year'],
+              ] as const
+            ).map(([key, label]) => (
+              <button
+                key={key}
+                onClick={() => setCycle(key)}
+                className={`px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 ${
+                  cycle === key ? 'bg-emerald-600 text-white font-bold' : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                {key === 'today' && <Calendar className="w-3 h-3" />}
+                {label}
+              </button>
+            ))}
           </div>
 
           {/* View Toggle: Numbers / Graphs / Pie */}
@@ -414,11 +468,48 @@ export const FinancialReports: React.FC<FinancialReportsProps> = ({
         </div>
       </div>
 
+      {/* Custom / month / year pickers */}
+      {(cycle === 'custom' || cycle === 'pick_month' || cycle === 'pick_year') && (
+        <div className="flex flex-wrap items-end gap-3 bg-[#0F1115] border border-[#1E293B] rounded-xl px-4 py-3 text-xs">
+          {cycle === 'custom' && (
+            <>
+              <label className="space-y-1">
+                <span className="block text-slate-400 font-semibold">From</span>
+                <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)}
+                  className="bg-[#161B22] border border-[#1E293B] rounded-lg px-2.5 py-1.5 text-[#E2E8F0] font-mono focus:outline-none focus:border-emerald-500" />
+              </label>
+              <label className="space-y-1">
+                <span className="block text-slate-400 font-semibold">To</span>
+                <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)}
+                  className="bg-[#161B22] border border-[#1E293B] rounded-lg px-2.5 py-1.5 text-[#E2E8F0] font-mono focus:outline-none focus:border-emerald-500" />
+              </label>
+            </>
+          )}
+          {cycle === 'pick_month' && (
+            <label className="space-y-1">
+              <span className="block text-slate-400 font-semibold">Month</span>
+              <input type="month" value={pickMonth} onChange={(e) => setPickMonth(e.target.value)}
+                className="bg-[#161B22] border border-[#1E293B] rounded-lg px-2.5 py-1.5 text-[#E2E8F0] font-mono focus:outline-none focus:border-emerald-500" />
+            </label>
+          )}
+          {cycle === 'pick_year' && (
+            <label className="space-y-1">
+              <span className="block text-slate-400 font-semibold">Year</span>
+              <input type="number" min={2000} max={2100} value={pickYear} onChange={(e) => setPickYear(e.target.value)}
+                className="w-28 bg-[#161B22] border border-[#1E293B] rounded-lg px-2.5 py-1.5 text-[#E2E8F0] font-mono focus:outline-none focus:border-emerald-500" />
+            </label>
+          )}
+          <p className="text-[11px] text-slate-500 self-center ml-auto">
+            KPIs, graphs and CSV all use this period. Same receipts as Transaction History.
+          </p>
+        </div>
+      )}
+
       {/* Top Level KPI Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-[#161B22] border border-[#1E293B] rounded-xl p-4 shadow-sm">
           <div className="text-xs text-slate-400 font-semibold uppercase tracking-wider">
-            Net Sales Subtotal ({cycle.toUpperCase()})
+            Net Sales Subtotal ({cycleTag})
           </div>
           <div className="text-2xl font-black font-mono text-[#E2E8F0] my-1">
             {primarySymbol} {grossSales.toFixed(2)}
@@ -515,12 +606,12 @@ export const FinancialReports: React.FC<FinancialReportsProps> = ({
           <div className="bg-[#161B22] border border-[#1E293B] rounded-xl p-5 shadow-sm">
             <div className="flex items-center justify-between border-b border-[#1E293B] pb-2 mb-4">
               <h3 className="font-bold text-sm text-[#E2E8F0] flex items-center gap-2">
-                <ChartLine className="w-4 h-4 text-emerald-400" /> Revenue Trend ({cycle.toUpperCase()})
+                <ChartLine className="w-4 h-4 text-emerald-400" /> Revenue Trend · {cycleLabel}
               </h3>
               <span className="text-[10px] text-slate-400">Live — redraws with every sale</span>
             </div>
             {revenueSeries.length === 0 ? (
-              <p className="text-xs text-slate-500 py-10 text-center">No sales recorded for this cycle yet.</p>
+              <p className="text-xs text-slate-500 py-10 text-center">No sales in this period — try another date range, month, or year.</p>
             ) : (
               <AnimatedAreaChart data={revenueSeries} formatValue={money} />
             )}
@@ -531,7 +622,7 @@ export const FinancialReports: React.FC<FinancialReportsProps> = ({
                 <ChartColumn className="w-4 h-4 text-cyan-400" /> Top Brands by Revenue
               </h3>
               {brandSeries.length === 0 ? (
-                <p className="text-xs text-slate-500 py-6 text-center">No sales recorded for this cycle yet.</p>
+                <p className="text-xs text-slate-500 py-6 text-center">No sales in this period — try another date range, month, or year.</p>
               ) : (
                 <AnimatedBarChart data={brandSeries} color="#22d3ee" formatValue={money} />
               )}
@@ -541,7 +632,7 @@ export const FinancialReports: React.FC<FinancialReportsProps> = ({
                 <ChartColumn className="w-4 h-4 text-emerald-400" /> Top Product Lines
               </h3>
               {productLineSeries.length === 0 ? (
-                <p className="text-xs text-slate-500 py-6 text-center">No sales recorded for this cycle yet.</p>
+                <p className="text-xs text-slate-500 py-6 text-center">No sales in this period — try another date range, month, or year.</p>
               ) : (
                 <AnimatedBarChart data={productLineSeries} color="#34d399" formatValue={money} />
               )}
@@ -553,20 +644,20 @@ export const FinancialReports: React.FC<FinancialReportsProps> = ({
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="bg-[#161B22] border border-[#1E293B] rounded-xl p-5 shadow-sm">
             <h3 className="font-bold text-sm text-[#E2E8F0] flex items-center gap-2 border-b border-[#1E293B] pb-2 mb-4">
-              <ChartPie className="w-4 h-4 text-cyan-400" /> Brand Sales Share ({cycle.toUpperCase()})
+              <ChartPie className="w-4 h-4 text-cyan-400" /> Brand Sales Share ({cycleTag})
             </h3>
             {brandSeries.length === 0 ? (
-              <p className="text-xs text-slate-500 py-10 text-center">No sales recorded for this cycle yet.</p>
+              <p className="text-xs text-slate-500 py-10 text-center">No sales in this period — try another date range, month, or year.</p>
             ) : (
               <AnimatedDonut data={brandSeries} formatValue={money} centerLabel="Brand Total" />
             )}
           </div>
           <div className="bg-[#161B22] border border-[#1E293B] rounded-xl p-5 shadow-sm">
             <h3 className="font-bold text-sm text-[#E2E8F0] flex items-center gap-2 border-b border-[#1E293B] pb-2 mb-4">
-              <ChartPie className="w-4 h-4 text-emerald-400" /> Category Sales Share ({cycle.toUpperCase()})
+              <ChartPie className="w-4 h-4 text-emerald-400" /> Category Sales Share ({cycleTag})
             </h3>
             {categorySeries.length === 0 ? (
-              <p className="text-xs text-slate-500 py-10 text-center">No sales recorded for this cycle yet.</p>
+              <p className="text-xs text-slate-500 py-10 text-center">No sales in this period — try another date range, month, or year.</p>
             ) : (
               <AnimatedDonut data={categorySeries} formatValue={money} centerLabel="Category Total" />
             )}
@@ -580,7 +671,7 @@ export const FinancialReports: React.FC<FinancialReportsProps> = ({
       <div className="bg-[#161B22] border border-[#1E293B] rounded-xl p-5 shadow-sm space-y-4">
         <div className="flex items-center justify-between border-b border-[#1E293B] pb-3">
           <h3 className="font-bold text-sm text-[#E2E8F0] flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-emerald-400" /> Brand Performance Matrix ({cycle.toUpperCase()})
+            <Sparkles className="w-4 h-4 text-emerald-400" /> Brand Performance Matrix ({cycleTag})
           </h3>
           <span className="text-xs text-slate-400">
             Derived live from transaction line items — syncs automatically with your vendors & catalog
@@ -658,7 +749,7 @@ export const FinancialReports: React.FC<FinancialReportsProps> = ({
 
           {topProductLines.length === 0 ? (
             <p className="text-xs text-slate-500 py-4 text-center">
-              No sales recorded for this cycle yet.
+              No sales in this period — try another date range, month, or year.
             </p>
           ) : (
             <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
@@ -702,7 +793,7 @@ export const FinancialReports: React.FC<FinancialReportsProps> = ({
 
           {topSizeBuckets.length === 0 ? (
             <p className="text-xs text-slate-500 py-4 text-center">
-              No sales recorded for this cycle yet.
+              No sales in this period — try another date range, month, or year.
             </p>
           ) : (
             <div className="grid grid-cols-2 gap-3">
@@ -813,7 +904,7 @@ export const FinancialReports: React.FC<FinancialReportsProps> = ({
       {viewMode === 'numbers' && (
       <div className="bg-[#161B22] border border-[#1E293B] rounded-xl p-5 shadow-sm space-y-3">
         <h3 className="font-bold text-sm text-slate-200 flex items-center gap-2">
-          <PieChart className="w-4 h-4 text-cyan-400" /> Revenue & Volume by Group Category ({cycle.toUpperCase()})
+          <PieChart className="w-4 h-4 text-cyan-400" /> Revenue & Volume by Group Category ({cycleTag})
         </h3>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">

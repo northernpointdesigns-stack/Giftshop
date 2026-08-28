@@ -14,9 +14,9 @@ describe('FinancialReports — data-driven figures', () => {
     clearCapturedBlobs();
   });
 
-  it('computes exact KPI figures for the Daily (EOD) cycle', () => {
+  it('computes exact KPI figures for the default This Month cycle (includes today)', () => {
     renderReport();
-    // Net sales subtotal (68 + 30.5 - 25 refund)
+    // Net sales subtotal (68 + 30.5 - 25 refund) — fixtures TX-1..3 are today
     expect(screen.getByText('SR 73.50')).toBeTruthy();
     // VAT collected (10.2 + 4.58 - 3.75)
     expect(screen.getByText('SR 11.03')).toBeTruthy();
@@ -98,9 +98,38 @@ describe('FinancialReports — data-driven figures', () => {
 
   it('shows empty-state panels and hides the peak banner with no data', () => {
     render(<FinancialReports transactions={[]} inventory={INVENTORY} vendors={VENDORS} />);
-    expect(screen.getAllByText(/No sales recorded for this cycle yet\./).length).toBe(2);
+    expect(screen.getAllByText(/No sales in this period/i).length).toBeGreaterThanOrEqual(2);
     expect(screen.queryByText(/Peak Shopping Window/)).toBeNull();
   });
+
+  it('supports custom date range, by-month and by-year period modes', async () => {
+    const user = userEvent.setup();
+    renderReport();
+
+    await user.click(screen.getByRole('button', { name: /Date range/i }));
+    expect(screen.getByText(/Period:/)).toBeTruthy();
+    // From/To date inputs appear
+    expect(document.querySelectorAll('input[type="date"]').length).toBeGreaterThanOrEqual(2);
+
+    await user.click(screen.getByRole('button', { name: /By month/i }));
+    expect(document.querySelector('input[type="month"]')).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: /By year/i }));
+    expect(document.querySelector('input[type="number"]')).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: /All Time/i }));
+    expect(screen.getByText(/5 Completed Transactions/)).toBeTruthy();
+  });
+
+  it('renders Graphs view without crashing when sales exist', async () => {
+    const user = userEvent.setup();
+    renderReport();
+    await user.click(screen.getByRole('tab', { name: /Graphs/i }));
+    expect(screen.getByText(/Revenue Trend/)).toBeTruthy();
+    // Chart SVG is present (area chart)
+    expect(document.querySelector('svg[role="img"]')).toBeTruthy();
+  });
+
 
   it('exports a CSV that mirrors the on-screen figures', async () => {
     const user = userEvent.setup();

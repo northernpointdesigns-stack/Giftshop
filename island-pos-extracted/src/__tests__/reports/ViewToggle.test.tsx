@@ -69,7 +69,7 @@ describe('FinancialReports — Numbers / Graphs / Pie view toggle', () => {
     );
     const graphsTab = screen.getByRole('tab', { name: /Graphs/i });
     graphsTab.click();
-    expect(screen.getAllByText(/No sales recorded for this cycle yet/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/No sales in this period/i).length).toBeGreaterThan(0);
   });
 });
 
