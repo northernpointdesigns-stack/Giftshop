@@ -116,7 +116,7 @@ export const LicenseGate: React.FC<LicenseGateProps> = ({ onActivated }) => {
         </div>
 
         <p className="text-center text-[9px] text-slate-700 leading-relaxed">
-          Your license is verified with LemonSqueezy once (online), then cached locally -- your POS keeps working offline after activation.
+          Your license is verified once online (LemonSqueezy or Payhip), then cached locally -- your POS keeps working offline after activation.
         </p>
       </div>
     </div>

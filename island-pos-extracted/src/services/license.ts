@@ -68,6 +68,29 @@ export const SUPPORT_EMAIL = 'support@your-store.example.com';
  */
 export const LEMON_SQUEEZY_LICENSE_API = 'https://api.lemonsqueezy.com/v1/licenses/activate';
 
+/**
+ * Payhip Software License Keys — customer-facing verification.
+ * Docs: https://payhip.com/api-reference (License Keys) and Help Center
+ * "Software License Keys". Unlike LemonSqueezy, verification authenticates
+ * with the per-PRODUCT secret key shown on the edit-product page where you
+ * enabled license keys — NOT your account API key (which must NEVER be
+ * embedded in a client). Payhip explicitly designed this product-secret
+ * scheme for public desktop applications.
+ *
+ * Enable at build time (leave unset to skip the Payhip path entirely):
+ *   VITE_PAYHIP_PRODUCT_SECRET=your-product-secret-key
+ */
+function readPayhipProductSecret(): string {
+  try {
+    // Static member expression so Vite replaces it at build time.
+    const v = import.meta.env.VITE_PAYHIP_PRODUCT_SECRET;
+    if (v) return String(v).trim();
+  } catch {}
+  return '';
+}
+export const PAYHIP_PRODUCT_SECRET = readPayhipProductSecret();
+export const PAYHIP_LICENSE_VERIFY_API = 'https://payhip.com/api/v2/license/verify';
+
 export interface StoredLicense {
   key: string;
   email: string;
@@ -331,20 +354,98 @@ export function resolveLicenseState(): LicenseState {
 }
 
 /**
+ * Verify a license key against Payhip's License API.
+ *
+ * GET /api/v2/license/verify?license_key=XXXX with header
+ * `product-secret-key: <product secret>` →
+ *   { "data": { "enabled": true, "buyer_email": "...", "uses": 1, ... } }
+ *
+ * The entered email must match the buyer email Payhip recorded (same
+ * contract as the activation screen's "email you used at checkout").
+ */
+export async function verifyLicensePayhip(
+  email: string,
+  key: string,
+  signal?: AbortSignal,
+): Promise<{ ok: boolean; error?: string }> {
+  if (!PAYHIP_PRODUCT_SECRET) {
+    // Build without a Payhip product secret: this provider is simply unused.
+    return { ok: false, error: 'Payhip verification is not configured in this build.' };
+  }
+  try {
+    const url = `${PAYHIP_LICENSE_VERIFY_API}?license_key=${encodeURIComponent(key.trim())}`;
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'product-secret-key': PAYHIP_PRODUCT_SECRET,
+        Accept: 'application/json',
+      },
+      signal,
+    });
+    let payload: { data?: { enabled?: boolean; buyer_email?: string } } | null = null;
+    try {
+      payload = await res.json();
+    } catch {
+      /* non-JSON body — handled below */
+    }
+    const data = payload?.data;
+    if (!res.ok || !data) {
+      return {
+        ok: false,
+        error:
+          res.status === 404
+            ? 'License key not found. Check the key in your Payhip receipt email.'
+            : 'Payhip could not verify this key right now. Please try again in a moment.',
+      };
+    }
+    if (!data.enabled) {
+      return {
+        ok: false,
+        error: 'This license key has been disabled. Please contact support.',
+      };
+    }
+    if (
+      data.buyer_email &&
+      data.buyer_email.trim().toLowerCase() !== email.trim().toLowerCase()
+    ) {
+      return {
+        ok: false,
+        error:
+          'This key was issued to a different email address. Use the exact email from your Payhip receipt.',
+      };
+    }
+    return { ok: true };
+  } catch (err: any) {
+    if (err?.name === 'AbortError') throw err;
+    return {
+      ok: false,
+      error: 'Could not reach Payhip. Check your internet connection and try again.',
+    };
+  }
+}
+
+/**
  * Attempt activation with a customer email + key.
  *
- * Two verification paths, both accepted on success -- the same screen serves
- * LemonSqueezy buyers AND owner-issued HMAC keys:
+ * Three verification paths, all accepted on success — the same screen serves
+ * LemonSqueezy buyers, Payhip buyers, AND owner-issued HMAC keys, so you can
+ * sell on any storefront (or none) without changing the app:
  *   1. LemonSqueezy License API (primary for DMG buyers). Needs internet once;
  *      the license is cached locally and the POS then runs offline.
- *   2. Offline HMAC (owner keys via scripts/generate-license.ts) and the
- *      no-network fallback when LS cannot be reached.
+ *   2. Payhip License API (when VITE_PAYHIP_PRODUCT_SECRET is configured).
+ *      Same one-time-online, cached-offline behavior.
+ *   3. Offline HMAC (owner keys via scripts/generate-license.ts) and the
+ *      no-network fallback when neither provider can be reached.
  */
 export async function activateLicense(
   email: string,
   key: string,
   signal?: AbortSignal,
-): Promise<{ ok: boolean; error?: string; source?: 'lemonsqueezy' | 'offline' }> {
+): Promise<{
+  ok: boolean;
+  error?: string;
+  source?: 'lemonsqueezy' | 'payhip' | 'offline';
+}> {
   const trimmedEmail = email.trim();
   const trimmedKey = key.trim();
   if (!trimmedEmail || !trimmedKey) return { ok: false, error: 'Please enter both your purchase email and license key.' };
@@ -356,24 +457,42 @@ export async function activateLicense(
 
   // 1) Verify with LemonSqueezy's customer License API (the buyer path).
   //    Activated keys are cached locally, so the POS then runs offline.
-  const online = await verifyLicenseOnline(trimmedEmail, trimmedKey, signal);
-  if (online.ok) {
+  const lemonsqueezy = await verifyLicenseOnline(trimmedEmail, trimmedKey, signal);
+  if (lemonsqueezy.ok) {
     storeLicense(trimmedEmail, trimmedKey);
     return { ok: true, source: 'lemonsqueezy' };
   }
 
-  // 2) Offline HMAC fallback: owner-issued keys (scripts/generate-license.ts),
-  //    and the no-network fallback when LS cannot be reached.
+  // 2) Verify with Payhip's License API (when this build ships a product
+  //    secret). Same cached-offline behavior as the LemonSqueezy path.
+  const payhip = await verifyLicensePayhip(trimmedEmail, trimmedKey, signal);
+  if (payhip.ok) {
+    storeLicense(trimmedEmail, trimmedKey);
+    return { ok: true, source: 'payhip' };
+  }
+
+  // 3) Offline HMAC fallback: owner-issued keys (scripts/generate-license.ts),
+  //    and the no-network fallback when neither provider could be reached.
   if (await verifyLicense(trimmedEmail, trimmedKey)) {
     storeLicense(trimmedEmail, trimmedKey);
     return { ok: true, source: 'offline' };
   }
 
-  // Neither succeeded: surface the online error first (most relevant for a
-  // buyer), then the offline mismatch message.
+  // None succeeded: surface the most relevant provider error. A specific
+  // provider verdict (disabled key, wrong email, not found) beats a generic
+  // "not configured"/network notice.
+  const isSpecific = (e?: string) =>
+    !!e && !/not configured/i.test(e) && !/Could not reach/i.test(e);
+  const relevantError = isSpecific(payhip.error)
+    ? payhip.error
+    : isSpecific(lemonsqueezy.error)
+      ? lemonsqueezy.error
+      : undefined;
   return {
     ok: false,
-    error: online.error || 'This key does not match the email entered. Keys are tied to the exact purchase email address.',
+    error:
+      relevantError ||
+      'This key does not match the email entered. Keys are tied to the exact purchase email address.',
   };
 }
 
