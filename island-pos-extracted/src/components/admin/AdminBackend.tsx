@@ -839,7 +839,7 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
     setMasterResetSuccess('');
 
     if (!masterResetAdminPin.trim()) {
-      setMasterResetError('Enter your current Admin PIN to change the Master Reset Password.');
+      setMasterResetError('Enter your current Admin Login PIN to change the Master Reset Password.');
       return;
     }
 
@@ -4965,7 +4965,7 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Admin Master Username:
+                    Admin Login Username:
                   </label>
                   <input
                     type="text"
@@ -4977,7 +4977,7 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Admin Master Security PIN / Password:
+                    Admin Login PIN / Password:
                   </label>
                   <input
                     type="password"
@@ -4985,6 +4985,9 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
                     onChange={(e) => setSettings({ ...settings, adminPin: e.target.value })}
                     className="w-full bg-[#0F1115] border border-[#1E293B] rounded-xl px-3.5 py-2 text-xs font-mono text-[#E2E8F0] focus:outline-none focus:border-cyan-500"
                   />
+                  <p className="text-[10px] text-slate-500 mt-1">
+                    Day-to-day staff login PIN for the administrator account.
+                  </p>
                 </div>
               </div>
 
@@ -4994,7 +4997,7 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
                   <div className="flex items-center gap-2">
                     <Lock className="w-4 h-4 text-rose-300 shrink-0" />
                     <h4 className="text-xs font-bold text-rose-200 uppercase tracking-wide">
-                      Master Reset Password (Backup)
+                      Master Reset Password (Backup — forgotten Admin PIN only)
                     </h4>
                   </div>
                   <span
@@ -5008,7 +5011,10 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-400 leading-relaxed">
-                  If you forget the Admin login PIN, use this on the staff login screen. It resets Admin PIN to temporary default <code className="text-amber-300 font-mono">admin123</code> (change it right after sign-in). Leave new password blank and save to clear. Never shown again after saving.
+                  <strong className="text-rose-200">Not</strong> your daily login PIN. This is a separate backup secret.
+                  If you forget the Admin Login PIN, use this on the staff login screen under &quot;Forgot admin PIN?&quot;.
+                  It resets the Admin Login PIN to temporary default <code className="text-amber-300 font-mono">admin123</code> (change it right after sign-in).
+                  Leave new password blank and save to clear. Never shown again after saving. Store it offline.
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
                   <div>
@@ -5023,7 +5029,7 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-semibold text-slate-300 mb-1">Confirm</label>
+                    <label className="block text-[11px] font-semibold text-slate-300 mb-1">Confirm Master Reset Password</label>
                     <input
                       type="password"
                       value={masterResetConfirm}
@@ -5034,7 +5040,7 @@ export const AdminBackend: React.FC<AdminBackendProps> = ({
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-semibold text-slate-300 mb-1">Current Admin PIN</label>
+                    <label className="block text-[11px] font-semibold text-slate-300 mb-1">Current Admin Login PIN</label>
                     <input
                       type="password"
                       value={masterResetAdminPin}
