@@ -8,6 +8,7 @@ const __dirname = path.dirname(__filename);
 
 let mainWindow = null;
 let secondaryWindow = null;
+let uiCheckTimer = null;
 
 function createWindows() {
   // Create primary cashier POS window
@@ -53,9 +54,15 @@ function createWindows() {
     }
   });
 
-  // Diagnostic: confirm the UI actually rendered after load
+  // Diagnostic: confirm the UI actually rendered after load.
+  // Guard the delayed check so closing the window (X) never crashes the app:
+  // the timer is cleared on close and checks the window is still alive before
+  // touching webContents.
   mainWindow.webContents.on('did-finish-load', () => {
-    setTimeout(() => {
+    if (uiCheckTimer) clearTimeout(uiCheckTimer);
+    uiCheckTimer = setTimeout(() => {
+      uiCheckTimer = null;
+      if (!mainWindow || mainWindow.isDestroyed()) return;
       mainWindow.webContents
         .executeJavaScript('document.body.innerText.replace(/\\n+/g, " | ").slice(0, 300)')
         .then((text) => {
@@ -69,6 +76,10 @@ function createWindows() {
   Menu.setApplicationMenu(null);
 
   mainWindow.on('closed', () => {
+    if (uiCheckTimer) {
+      clearTimeout(uiCheckTimer);
+      uiCheckTimer = null;
+    }
     mainWindow = null;
     if (secondaryWindow) {
       secondaryWindow.close();
