@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en" class="bg-[#0F1115] text-[#E2E8F0]">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>The Gift Shop POS</title>
+    <meta name="description" content="The Gift Shop POS — white-label retail point-of-sale terminal with offline capability." />
+    <meta name="theme-color" content="#0F1115" />
+    <link rel="manifest" href="/manifest.json" />
+    <meta property="og:title" content="The Gift Shop POS" />
+    <meta property="og:description" content="The Gift Shop POS — white-label retail point-of-sale terminal." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+  </head>
+  <body class="bg-[#0F1115] text-[#E2E8F0] min-h-screen overflow-x-hidden">
+    <div id="root"></div>
+    <script>
+      // Startup crash diagnostics: surface full error stacks through the
+      // console channel so the Electron main-process logger can capture them.
+      window.addEventListener('error', function (e) {
+        var stack = (e.error && e.error.stack) ? e.error.stack : e.message;
+        console.error('STARTUP_ERROR_STACK >>> ' + stack);
+      });
+      window.addEventListener('unhandledrejection', function (e) {
+        var r = e.reason;
+        console.error('STARTUP_REJECTION >>> ' + ((r && r.stack) ? r.stack : String(r)));
+      });
+    </script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+

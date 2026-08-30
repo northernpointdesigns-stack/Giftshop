@@ -1,0 +1,110 @@
+@import "tailwindcss";
+
+/* Global Root Constraints & Antialiasing */
+html,
+body,
+#root {
+  background-color: #0F1115;
+  color: #E2E8F0;
+  min-height: 100vh;
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: inherit;
+}
+
+/* Custom Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0F1115;
+}
+::-webkit-scrollbar-thumb {
+  background: #1E293B;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #334155;
+}
+
+/* Admin navigation must remain usable with a mouse at every viewport width.
+   Sub-pills wrap instead of becoming hidden in a trackpad-only scroll strip. */
+.admin-subnav > button {
+  min-width: 0;
+  max-width: 100%;
+  text-align: left;
+}
+
+.admin-subnav > button > span {
+  min-width: 0;
+  white-space: normal;
+}
+
+/* Thermal Receipt Printing Logic */
+@media print {
+  /* Only hide other elements if a thermal receipt is on screen */
+  body:has(.thermal-receipt) * {
+    visibility: hidden;
+  }
+  
+  /* Make the printable receipt and all its children visible */
+  body:has(.thermal-receipt) .thermal-receipt,
+  body:has(.thermal-receipt) .thermal-receipt * {
+    visibility: visible;
+  }
+
+  /* Reset positioning for the printable area to take over the printed page */
+  .thermal-receipt {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 80mm;
+    margin: 0;
+    padding: 0;
+    background-color: white !important;
+    color: black !important;
+  }
+
+  /* Ensure text colors are dark for thermal */
+  .thermal-receipt .text-slate-200,
+  .thermal-receipt .text-slate-300,
+  .thermal-receipt .text-slate-400,
+  .thermal-receipt .text-slate-500,
+  .thermal-receipt .text-slate-600,
+  .thermal-receipt .text-slate-800 {
+    color: #000 !important;
+  }
+  
+  .thermal-receipt .border-slate-300,
+  .thermal-receipt .border-slate-700,
+  .thermal-receipt .border-[#1E293B] {
+    border-color: #000 !important;
+  }
+  
+  .thermal-receipt .bg-\[\#0F1115\],
+  .thermal-receipt .bg-\[\#161B22\] {
+    background-color: white !important;
+  }
+  
+  /* Hide buttons or elements explicitly told to hide on print */
+  .thermal-receipt .print\:hidden,
+  .thermal-receipt .print\:hidden * {
+    display: none !important;
+  }
+  
+  /* Fix thermal printer page sizing */
+  @page {
+    margin: 0;
+    size: 80mm auto;
+  }
+}
