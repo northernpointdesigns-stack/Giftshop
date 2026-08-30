@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { Mock } from 'vitest';
 
 /**
- * Activation-chain tests: LemonSqueezy → Payhip → offline HMAC fallback.
+  * Activation-chain tests: Payhip → LemonSqueezy → offline HMAC fallback.
  * fetch is stubbed globally; each test re-imports license.ts so the
  * build-time env flags (VITE_PAYHIP_PRODUCT_SECRET) are re-read.
  */
