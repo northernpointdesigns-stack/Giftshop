@@ -1,0 +1,67 @@
+════════════════════════════════════════════════════════════════════
+ GIFTSHOP POS — v1.0.0-customer RELEASE DOWNLOAD LINKS
+ Repo: https://github.com/northernpointdesigns-stack/Giftshop
+ Release: v1.0.0-customer
+ Created: 2026-08-28 (14-day trial build + license activation enabled)
+════════════════════════════════════════════════════════════════════
+
+✅ GIFTSHOP REPO IS PUBLIC — verified live 2026-08-28
+   Anonymous GitHub API confirms `private: False`.
+   All download links below resolve with HTTP 200 for anyone (no GitHub login).
+   Giftshop stays public. Giftshopownervs remains private (contains unlocked builds).
+
+────────────────────────────────────────────────────────────────────
+ DIRECT DOWNLOAD LINKS (paste these anywhere)
+────────────────────────────────────────────────────────────────────
+macOS disk image (.dmg):
+https://github.com/northernpointdesigns-stack/Giftshop/releases/download/v1.0.0-customer/The.Gift.Shop.POS-1.0.0-arm64.dmg
+
+macOS zip (.zip):
+https://github.com/northernpointdesigns-stack/Giftshop/releases/download/v1.0.0-customer/The.Gift.Shop.POS-1.0.0-arm64-mac.zip
+
+Windows installer (.exe):
+https://github.com/northernpointdesigns-stack/Giftshop/releases/download/v1.0.0-customer/The.Gift.Shop.POS.Setup.1.0.0.exe
+
+Customer Setup & User Guide (.pdf):
+https://github.com/northernpointdesigns-stack/Giftshop/releases/download/v1.0.0-customer/Giftshop_POS_Customer_Setup_and_User_Guide.pdf
+
+────────────────────────────────────────────────────────────────────
+ "LATEST" VERSION LINKS (always serve the newest tag)
+────────────────────────────────────────────────────────────────────
+https://github.com/northernpointdesigns-stack/Giftshop/releases/latest/download/The.Gift.Shop.POS-1.0.0-arm64.dmg
+https://github.com/northernpointdesigns-stack/Giftshop/releases/latest/download/The.Gift.Shop.POS-1.0.0-arm64-mac.zip
+https://github.com/northernpointdesigns-stack/Giftshop/releases/latest/download/The.Gift.Shop.POS.Setup.1.0.0.exe
+https://github.com/northernpointdesigns-stack/Giftshop/releases/latest/download/Giftshop_POS_Customer_Setup_and_User_Guide.pdf
+
+────────────────────────────────────────────────────────────────────
+ PAYHIP PRODUCT DESCRIPTION SNIPPET (ready to paste)
+────────────────────────────────────────────────────────────────────
+📥 **Download the app (free trial — 14 days):**
+
+- **Mac:** [Download .dmg](https://github.com/northernpointdesigns-stack/Giftshop/releases/download/v1.0.0-customer/The.Gift.Shop.POS-1.0.0-arm64.dmg)
+- **Windows:** [Download .exe](https://github.com/northernpointdesigns-stack/Giftshop/releases/download/v1.0.0-customer/The.Gift.Shop.POS.Setup.1.0.0.exe)
+- **Setup guide:** [Read the PDF guide](https://github.com/northernpointdesigns-stack/Giftshop/releases/download/v1.0.0-customer/Giftshop_POS_Customer_Setup_and_User_Guide.pdf)
+
+Buyers: install, run → the app starts a 14-day free trial.
+Paying customers: your unique license key arrives by email — enter it in
+the app to unlock permanently (no re-download needed).
+
+⚠️ Mac users, if macOS says "damaged/unidentified":
+   open Terminal and run →  xattr -cr "/Applications/The Gift Shop POS.app"
+
+────────────────────────────────────────────────────────────────────
+ PAYHIP PRODUCT MAPPING (your two products)
+────────────────────────────────────────────────────────────────────
+Free Trial product:  https://payhip.com/b/qIRj6   (price $0, License keys OFF)
+Full License product: https://payhip.com/b/PHMGz  (paid, License keys ON → Autogenerate,
+                                  unique key emailed on purchase)
+VITE_PURCHASE_URL (set on Giftshop repo, points to paid product):
+                  https://payhip.com/b/PHMGz
+
+Both products: attach docs/Giftshop_POS_Download_and_Activation.pdf
+               (OR paste the DIRECT DOWNLOAD LINKS above into the
+                description — they are real hyperlinks, one-click download).
+Payment → Payhip auto-generates + emails the license key.
+The download link in the product is separate from the key — buyers can
+use either the description link or the attached PDF's links to get the
+same installer; activation is handled entirely by Payhip's checkout.
