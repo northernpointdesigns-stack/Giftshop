@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+app-source/dist-desktop/
+dist-desktop/
+
+# Huge pre-built packages (too big for GitHub — 100MB file limit)
+*.AppImage
+*.snap
+snap-extracted/
+BoutiquePOS-0.0.0.AppImage*
+BoutiquePOS-0.0.0.snap*
+*.dmg
+*.exe
+
+# Editor workspace files
+*.code-workspace
+
+# OS junk
+.DS_Store
+
+# Logs
+*.log
+
+# Unrelated / external artifacts — this repo is island-pos only
+dont touch/
+island-pos-extracted/pos-main/
+oracleJdk-26.jdk/
+islandpos-*.zip
+# Local junk / huge toolchains (never commit)
+dont touch/
+oracleJdk-26.jdk/
+island-pos-extracted/pos-main/
+island-pos-extracted/dist/
+island-pos-extracted/dist-desktop/
+island-pos-extracted/.venv/
