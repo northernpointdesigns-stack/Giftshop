@@ -44,67 +44,33 @@ jobs:
         run: echo "sdk.dir=${ANDROID_SDK_ROOT}" >> local.properties
         working-directory: android
 
-      - name: Check signing secrets available
-        id: sign
-        shell: bash
-        run: |
-          if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
-            echo "sign_ready=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "sign_ready=false" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Decode signing keystore
-        if: steps.sign.outputs.sign_ready == 'true'
-        shell: bash
-        run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/giftshop-pos-release.keystore"
-
-      - name: Build debug APK
-        working-directory: android
-        run: ./gradlew assembleDebug --no-daemon
-
-      - name: Sign APK with release keystore
-        if: steps.sign.outputs.sign_ready == 'true'
-        working-directory: android
         shell: bash
         run: |
-          set -euo pipefail
-          BT="${ANDROID_SDK_ROOT}/build-tools/36.0.0"
-          SRC="app/build/outputs/apk/debug/app-debug.apk"
-          ALIGNED="$RUNNER_TEMP/app-aligned.apk"
-          OUT="$RUNNER_TEMP/GiftshopPOS-signed.apk"
-          "$BT/zipalign" -f -p 4 "$SRC" "$ALIGNED"
-          "$BT/apksigner" sign --v1-signing-enabled --v2-signing-enabled --v3-signing-enabled \
-            --ks "$RUNNER_TEMP/giftshop-pos-release.keystore" \
-            --ks-key-alias "${{ secrets.ANDROID_KEY_ALIAS || 'giftshoppos' }}" \
-            --ks-pass "pass:${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" \
-            --key-pass "pass:${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" \
-            --out "$OUT" "$ALIGNED"
-          "$BT/apksigner" verify --print-certs "$OUT"
-          cp "$OUT" app/build/outputs/apk/debug/GiftshopPOS-signed.apk
+          mkdir -p "$RUNNER_TEMP"
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/giftshop-pos-release.keystore"
 
-      - name: Upload debug APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: giftshop-pos-debug
-          path: android/app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
+      - name: Build signed release APK
+        working-directory: android
+        run: ./gradlew assembleRelease --no-daemon
+        env:
+          ANDROID_KEYSTORE_FILE: ${{ runner.temp }}/giftshop-pos-release.keystore
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
 
       - name: Upload signed APK
-        if: steps.sign.outputs.sign_ready == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: giftshop-pos-signed
-          path: android/app/build/outputs/apk/debug/GiftshopPOS-signed.apk
+          name: giftshop-pos-release
+          path: android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
 
       - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/') && steps.sign.outputs.sign_ready == 'true'
+        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            android/app/build/outputs/apk/debug/GiftshopPOS-signed.apk
-            android/app/build/outputs/apk/debug/app-debug.apk
+          files: android/app/build/outputs/apk/release/app-release.apk
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
