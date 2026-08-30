@@ -1,0 +1,271 @@
+name: Build Gift Shop POS Releases
+# Build from the committed POS project root.
+
+on:
+  # Manual builds only — Actions minutes are only consumed when you click
+  # "Run workflow". Tag-triggered release builds are disabled to avoid
+  # automatic unsigned builds that fail on missing cert secrets.
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  RELEASE_BUILD: ${{ startsWith(github.ref, 'refs/tags/v') }}
+  # Unlock flag: set repo VARIABLE VITE_DISABLE_LICENSE=1 (Settings → Secrets
+  # and variables → Actions → Variables) to strip the 14-day trial gate from
+  # the built apps. Repos without the variable keep the customer trial flow.
+  VITE_DISABLE_LICENSE: ${{ vars.VITE_DISABLE_LICENSE || '0' }}
+  # Customer storefront (Giftshop repo). Set Variables/Secrets:
+  #   VITE_PURCHASE_URL, VITE_PAYHIP_PRODUCT_SECRET
+  VITE_PURCHASE_URL: ${{ vars.VITE_PURCHASE_URL || secrets.VITE_PURCHASE_URL || '' }}
+  VITE_PAYHIP_PRODUCT_SECRET: ${{ secrets.VITE_PAYHIP_PRODUCT_SECRET || vars.VITE_PAYHIP_PRODUCT_SECRET || '' }}
+
+jobs:
+  docs:
+    name: Customer setup PDF
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: island-pos-extracted
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install reportlab
+        run: pip install reportlab
+
+      - name: Generate customer setup guide PDF
+        run: python3 scripts/build_customer_guide_pdf.py
+
+      - name: Upload setup guide PDF
+        uses: actions/upload-artifact@v4
+        with:
+          name: gift-shop-pos-setup-guide
+          path: island-pos-extracted/docs/Giftshop_POS_Customer_Setup_and_User_Guide.pdf
+          if-no-files-found: error
+
+  desktop:
+    name: Desktop (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: win
+          - os: macos-14
+            platform: mac
+    defaults:
+      run:
+        working-directory: island-pos-extracted
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v5
+
+      - name: Configure license mode
+        shell: bash
+        run: |
+          echo "VITE_DISABLE_LICENSE=$VITE_DISABLE_LICENSE" >> .env.production
+          if [ -n "$VITE_PURCHASE_URL" ]; then
+            echo "VITE_PURCHASE_URL=$VITE_PURCHASE_URL" >> .env.production
+          fi
+          if [ -n "$VITE_PAYHIP_PRODUCT_SECRET" ]; then
+            echo "VITE_PAYHIP_PRODUCT_SECRET=$VITE_PAYHIP_PRODUCT_SECRET" >> .env.production
+          fi
+          if [ "$VITE_DISABLE_LICENSE" = "1" ]; then
+            echo "UNLOCKED owner build - trial/activation gate disabled"
+          else
+            echo "Customer build - 14-day trial gate enabled"
+            echo "Purchase URL set: $([ -n \"$VITE_PURCHASE_URL\" ] && echo yes || echo no)"
+            echo "Payhip secret set: $([ -n \"$VITE_PAYHIP_PRODUCT_SECRET\" ] && echo yes || echo no)"
+          fi
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: island-pos-extracted/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate TypeScript
+        run: npm run lint
+
+      - name: Build web bundle
+        run: npm run build
+
+      - name: Verify Windows signing secrets
+        if: matrix.platform == 'win' && env.RELEASE_BUILD == 'true'
+        env:
+          WINDOWS_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        shell: bash
+        run: |
+          test -n "$WINDOWS_CERTIFICATE_BASE64" || { echo 'Missing WINDOWS_CERTIFICATE_BASE64'; exit 1; }
+          test -n "$WINDOWS_CERTIFICATE_PASSWORD" || { echo 'Missing WINDOWS_CERTIFICATE_PASSWORD'; exit 1; }
+
+      - name: Prepare macOS signing and notarization
+        if: matrix.platform == 'mac' && env.RELEASE_BUILD == 'true'
+        shell: bash
+        env:
+          MAC_CERTIFICATE_BASE64: ${{ secrets.MAC_CERTIFICATE_BASE64 }}
+          MAC_CERTIFICATE_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.MAC_KEYCHAIN_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          test -n "$MAC_CERTIFICATE_BASE64" || { echo 'Missing MAC_CERTIFICATE_BASE64'; exit 1; }
+          test -n "$MAC_CERTIFICATE_PASSWORD" || { echo 'Missing MAC_CERTIFICATE_PASSWORD'; exit 1; }
+          test -n "$KEYCHAIN_PASSWORD" || { echo 'Missing MAC_KEYCHAIN_PASSWORD'; exit 1; }
+          test -n "$APPLE_ID" || { echo 'Missing APPLE_ID'; exit 1; }
+          test -n "$APPLE_APP_SPECIFIC_PASSWORD" || { echo 'Missing APPLE_APP_SPECIFIC_PASSWORD'; exit 1; }
+          test -n "$APPLE_TEAM_ID" || { echo 'Missing APPLE_TEAM_ID'; exit 1; }
+          CERT_PATH="$RUNNER_TEMP/macos-signing.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/build.keychain-db"
+          printf '%s' "$MAC_CERTIFICATE_BASE64" | base64 --decode > "$CERT_PATH"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERT_PATH" -P "$MAC_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH"
+          security default-keychain -s "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          echo "CSC_LINK=$CERT_PATH" >> "$GITHUB_ENV"
+
+      - name: Build Windows installer
+        if: matrix.platform == 'win' && env.RELEASE_BUILD == 'false'
+        run: npx electron-builder --win nsis --publish never
+
+      - name: Build signed Windows installer
+        if: matrix.platform == 'win' && env.RELEASE_BUILD == 'true'
+        env:
+          CSC_LINK: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
+          CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: npx electron-builder --win nsis --publish never
+
+      - name: Build macOS installer
+        if: matrix.platform == 'mac' && env.RELEASE_BUILD == 'false'
+        run: npx electron-builder --mac dmg zip --arm64 --publish never
+
+      - name: Ad-hoc sign macOS app and repackage DMG
+        if: matrix.platform == 'mac' && env.RELEASE_BUILD == 'false'
+        run: |
+          set -e
+          APP_PATH=$(find island-pos-extracted/dist-desktop -maxdepth 3 -name "*.app" -type d | head -1)
+          echo "Signing $APP_PATH"
+          codesign --deep --force --sign - --timestamp=none "$APP_PATH"
+          codesign --verify --verbose "$APP_PATH"
+          DMG_NAME=$(find island-pos-extracted/dist-desktop -name "*.dmg" | head -1)
+          if [ -n "$DMG_NAME" ]; then rm -f "$DMG_NAME"; fi
+          hdiutil create -volname "The Gift Shop POS 1.0.0-arm64" -srcfolder "$APP_PATH" -ov -format UDZO "island-pos-extracted/dist-desktop/The Gift Shop POS-1.0.0-arm64.dmg"
+
+      - name: Build signed macOS installer
+        if: matrix.platform == 'mac' && env.RELEASE_BUILD == 'true'
+        env:
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: npx electron-builder --mac dmg zip --arm64 --publish never
+
+      - name: Upload desktop installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: gift-shop-pos-${{ matrix.platform }}
+          path: |
+            island-pos-extracted/dist-desktop/*.exe
+            island-pos-extracted/dist-desktop/*.dmg
+            island-pos-extracted/dist-desktop/*.zip
+          if-no-files-found: error
+
+  ios-simulator:
+    name: iOS simulator build
+    runs-on: macos-14
+    defaults:
+      run:
+        working-directory: island-pos-extracted
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v5
+
+      - name: Configure license mode
+        shell: bash
+        run: |
+          echo "VITE_DISABLE_LICENSE=$VITE_DISABLE_LICENSE" >> .env.production
+          if [ -n "$VITE_PURCHASE_URL" ]; then
+            echo "VITE_PURCHASE_URL=$VITE_PURCHASE_URL" >> .env.production
+          fi
+          if [ -n "$VITE_PAYHIP_PRODUCT_SECRET" ]; then
+            echo "VITE_PAYHIP_PRODUCT_SECRET=$VITE_PAYHIP_PRODUCT_SECRET" >> .env.production
+          fi
+          if [ "$VITE_DISABLE_LICENSE" = "1" ]; then
+            echo "UNLOCKED owner build - trial/activation gate disabled"
+          else
+            echo "Customer build - 14-day trial gate enabled"
+            echo "Purchase URL set: $([ -n \"$VITE_PURCHASE_URL\" ] && echo yes || echo no)"
+            echo "Payhip secret set: $([ -n \"$VITE_PAYHIP_PRODUCT_SECRET\" ] && echo yes || echo no)"
+          fi
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: island-pos-extracted/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web bundle
+        run: npm run build
+
+      - name: Generate and sync Capacitor iOS project
+        run: |
+          npx cap add ios
+          npx cap sync ios
+
+      - name: Build unsigned simulator app
+        run: >-
+          xcodebuild
+          -project ios/App/App.xcodeproj
+          -scheme App
+          -sdk iphonesimulator
+          -destination 'generic/platform=iOS Simulator'
+          -configuration Debug
+          -derivedDataPath ios/build
+          CODE_SIGNING_ALLOWED=NO
+          build
+
+      - name: Upload iOS simulator app
+        uses: actions/upload-artifact@v4
+        with:
+          name: gift-shop-pos-ios-simulator
+          path: island-pos-extracted/ios/build/Build/Products/Debug-iphonesimulator/App.app
+          if-no-files-found: error
+
+  release:
+    name: Publish GitHub release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [desktop, docs, ios-simulator]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Publish release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: release-assets/**/*
