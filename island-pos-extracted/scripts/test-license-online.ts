@@ -1,41 +1,32 @@
 /**
- * Manual integration probe for the LemonSqueezy license path.
+ * Manual integration probe for the Payhip license path.
  *
- * Run AFTER you have a real license key + the buyer's email from a
- * LemonSqueezy purchase (test-mode products work too):
+ * Run AFTER you have a real license key + the buyer's email from a Payhip
+ * purchase and the product secret in env:
  *
- *   npx tsx scripts/test-license-online.ts <license-key> <customer@email>
+ *   PAYHIP_PRODUCT_SECRET=prod_sk_xxx npx tsx scripts/test-license-online.ts <license-key> <customer@email>
  *
- * It calls LemonSqueezy's public License API /activate endpoint and prints the
- * parsed result plus the raw response, so you can confirm the exact success/
- * failure shape that src/services/license.ts parses.
+ * Calls Payhip's public License API verify endpoint and prints the parsed
+ * result plus the raw response, so you can confirm the exact success/failure
+ * shape that src/services/license.ts (verifyLicensePayhip) parses.
  */
-import { LEMON_SQUEEZY_LICENSE_API, verifyLicenseOnline } from '../src/services/license';
+import { PAYHIP_LICENSE_VERIFY_API } from '../src/services/license';
 
 const [key, email] = process.argv.slice(2);
+const secret = process.env.PAYHIP_PRODUCT_SECRET || '';
 
-if (!key || !email) {
-  console.error('\nUsage: npx tsx scripts/test-license-online.ts <license-key> <customer@email>\n');
-  console.error('Example:');
-  console.error('  npx tsx scripts/test-license-online.ts LSKEY-XXXX-YYYY-JANE jane@beachshop.sc\n');
+if (!key || !email || !secret) {
+  console.error('\nUsage: PAYHIP_PRODUCT_SECRET=prod_sk_xxx npx tsx scripts/test-license-online.ts <license-key> <customer@email>\n');
+  if (!secret) console.error('Missing PAYHIP_PRODUCT_SECRET (your Payhip product secret).\n');
   process.exit(1);
 }
 
 (async () => {
-  console.log(`\nActivating LemonSqueezy key for ${email} ...`);
-  console.log('Endpoint:', LEMON_SQUEEZY_LICENSE_API);
-
-  const res = await verifyLicenseOnline(email, key);
-  console.log('Parsed result:', JSON.stringify(res, null, 2));
-
-  // Dump the raw LS response for shape confirmation.
-  const form = new URLSearchParams({ license_key: key, email, instance_name: 'IslandPOSTest' });
+  const url = `${PAYHIP_LICENSE_VERIFY_API}?license_key=${encodeURIComponent(key)}&product_secret=${encodeURIComponent(secret)}`;
+  console.log(`\nVerifying Payhip key for ${email} ...`);
+  console.log('Endpoint:', PAYHIP_LICENSE_VERIFY_API);
   try {
-    const r = await fetch(LEMON_SQUEEZY_LICENSE_API, {
-      method: 'POST',
-      headers: { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: form,
-    });
+    const r = await fetch(url, { headers: { Accept: 'application/json' } });
     const text = await r.text();
     console.log(`\nHTTP ${r.status} ${r.statusText}`);
     try {
@@ -44,6 +35,7 @@ if (!key || !email) {
       console.log('Raw body:', text);
     }
   } catch (e) {
-    console.log('Raw fetch failed:', (e as Error)?.message ?? e);
+    console.log('Fetch failed:', (e as Error)?.message ?? e);
+    process.exit(1);
   }
 })();

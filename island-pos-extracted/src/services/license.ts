@@ -77,6 +77,9 @@ function readPayhipProductSecret(): string {
 }
 export const PAYHIP_PRODUCT_SECRET = readPayhipProductSecret();
 export const PAYHIP_LICENSE_VERIFY_API = 'https://payhip.com/api/v2/license/verify';
+// LemonSqueezy public License API is kept only as a legacy fallback for older
+// DMG buyers. Payhip is the primary activation path (see activateLicense).
+export const LEMON_SQUEEZY_LICENSE_API = 'https://api.lemonsqueezy.com/v1/licenses/activate';
 
 export interface StoredLicense {
   key: string;
@@ -423,10 +426,11 @@ export async function verifyLicensePayhip(
  * Three verification paths, all accepted on success — the same screen serves
  * LemonSqueezy buyers, Payhip buyers, AND owner-issued HMAC keys, so you can
  * sell on any storefront (or none) without changing the app:
- *   1. LemonSqueezy License API (primary for DMG buyers). Needs internet once;
- *      the license is cached locally and the POS then runs offline.
- *   2. Payhip License API (when VITE_PAYHIP_PRODUCT_SECRET is configured).
- *      Same one-time-online, cached-offline behavior.
+  *   1. Payhip License API (when VITE_PAYHIP_PRODUCT_SECRET is configured).
+ *      Needs internet once; the license is cached locally and the POS then
+ *      runs offline.
+ *   2. Legacy LemonSqueezy License API (older DMG buyers); skipped silently
+ *      when no LemonSqueezy key is presented.
  *   3. Offline HMAC (owner keys via scripts/generate-license.ts) and the
  *      no-network fallback when neither provider can be reached.
  */
@@ -448,20 +452,20 @@ export async function activateLicense(
     return { ok: false, error: 'That key looks too short — check for missing characters.' };
   }
 
-  // 1) Verify with LemonSqueezy's customer License API (the buyer path).
-  //    Activated keys are cached locally, so the POS then runs offline.
-  const lemonsqueezy = await verifyLicenseOnline(trimmedEmail, trimmedKey, signal);
-  if (lemonsqueezy.ok) {
-    storeLicense(trimmedEmail, trimmedKey);
-    return { ok: true, source: 'lemonsqueezy' };
-  }
-
-  // 2) Verify with Payhip's License API (when this build ships a product
-  //    secret). Same cached-offline behavior as the LemonSqueezy path.
+      // 1) Verify with Payhip's License API (when this build ships a product
+  //    secret). Activated keys are cached locally, so the POS then runs offline.
   const payhip = await verifyLicensePayhip(trimmedEmail, trimmedKey, signal);
   if (payhip.ok) {
     storeLicense(trimmedEmail, trimmedKey);
     return { ok: true, source: 'payhip' };
+  }
+
+  // 2) Legacy fallback: LemonSqueezy License API (older DMG buyers). Only
+  //    reached when Payhip is unreachable or could not confirm the key.
+  const lemonsqueezy = await verifyLicenseOnline(trimmedEmail, trimmedKey, signal);
+  if (lemonsqueezy.ok) {
+    storeLicense(trimmedEmail, trimmedKey);
+    return { ok: true, source: 'lemonsqueezy' };
   }
 
   // 3) Offline HMAC fallback: owner-issued keys (scripts/generate-license.ts),
@@ -473,7 +477,8 @@ export async function activateLicense(
 
   // None succeeded: surface the most relevant provider error. A specific
   // provider verdict (disabled key, wrong email, not found) beats a generic
-  // "not configured"/network notice.
+  // "not configured"/network notice. Payhip verdicts take priority, then
+  // LemonSqueezy, so the message matches the configured buyer path.
   const isSpecific = (e?: string) =>
     !!e && !/not configured/i.test(e) && !/Could not reach/i.test(e);
   const relevantError = isSpecific(payhip.error)

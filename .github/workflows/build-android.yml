@@ -10,13 +10,10 @@ on:
 # Unlock flag: set repo VARIABLE VITE_DISABLE_LICENSE=1 (Settings → Secrets
 # and variables → Actions → Variables) to strip the 14-day trial gate from
 # the built APK. Repos without the variable keep the customer trial flow.
-#
-# Android uses its OWN Payhip product (separate product secret + buy URL) so
-# license keys issued for the Android product only unlock the Android APK.
 env:
   VITE_DISABLE_LICENSE: ${{ vars.VITE_DISABLE_LICENSE || '0' }}
-  VITE_PURCHASE_URL: ${{ vars.VITE_PURCHASE_URL_ANDROID || secrets.VITE_PURCHASE_URL_ANDROID || '' }}
-  VITE_PAYHIP_PRODUCT_SECRET: ${{ secrets.VITE_PAYHIP_PRODUCT_SECRET_ANDROID || vars.VITE_PAYHIP_PRODUCT_SECRET_ANDROID || '' }}
+  VITE_PURCHASE_URL: ${{ vars.VITE_PURCHASE_URL || secrets.VITE_PURCHASE_URL || '' }}
+  VITE_PAYHIP_PRODUCT_SECRET: ${{ secrets.VITE_PAYHIP_PRODUCT_SECRET || vars.VITE_PAYHIP_PRODUCT_SECRET || '' }}
 
 jobs:
   build-apk:
@@ -71,70 +68,11 @@ jobs:
       - name: Build debug APK
         run: npm run android:build:debug
 
-      # ── Release signing (optional) ──────────────────────────────────
-      # Add ANDROID_KEYSTORE_BASE64 (the base64 of giftshop-pos-release.keystore)
-      # + ANDROID_KEYSTORE_PASSWORD as repo secrets (Settings → Secrets and
-      # variables → Actions) so every manual build is signed with the SAME
-      # release key → users can install updates in place without reinstall.
-      # Without the secrets the build just ships the debug APK as before.
-      # NOTE: the `secrets` context is NOT allowed in step `if:` conditions,
-      # so keystore availability is detected via a step output instead.
-      - name: Detect signing keystore
-        id: signcheck
-        shell: bash
-        run: |
-          if [ -n "${ANDROID_KEYSTORE_BASE64:-}" ]; then
-            echo "sign_ready=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "sign_ready=false" >> "$GITHUB_OUTPUT"
-          fi
-        env:
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-
-      - name: Decode signing keystore
-        if: steps.signcheck.outputs.sign_ready == 'true'
-        shell: bash
-        run: |
-          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/giftshop-pos-release.keystore"
-          test -s "$RUNNER_TEMP/giftshop-pos-release.keystore"
-        env:
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-
-      - name: Sign APK with release keystore
-        if: steps.signcheck.outputs.sign_ready == 'true'
-        shell: bash
-        run: |
-          set -euo pipefail
-          SRC="android/app/build/outputs/apk/debug/app-debug.apk"
-          ALIGNED="$RUNNER_TEMP/app-aligned.apk"
-          OUT="android/app/build/outputs/apk/debug/The.Gift.Shop.POS-1.0.0-android.apk"
-          BT="$ANDROID_SDK_ROOT/build-tools/36.0.0"
-          "$BT/zipalign" -f -p 4 "$SRC" "$ALIGNED"
-          "$BT/apksigner" sign \
-            --ks "$RUNNER_TEMP/giftshop-pos-release.keystore" \
-            --ks-key-alias "$ANDROID_KEY_ALIAS" \
-            --ks-pass "pass:$ANDROID_KEYSTORE_PASSWORD" \
-            --key-pass "pass:$ANDROID_KEYSTORE_PASSWORD" \
-            --out "$OUT" "$ALIGNED"
-          "$BT/apksigner" verify --print-certs "$OUT"
-          echo "Signed APK ready: $OUT"
-        env:
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS || 'giftshoppos' }}
-
-      - name: Upload Android APK (debug)
+      - name: Upload Android APK
         uses: actions/upload-artifact@v4
         with:
           name: gift-shop-pos-android-debug
           path: island-pos-extracted/android/app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
-
-      - name: Upload Android APK (release-signed)
-        if: steps.signcheck.outputs.sign_ready == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: gift-shop-pos-android-signed
-          path: island-pos-extracted/android/app/build/outputs/apk/debug/The.Gift.Shop.POS-1.0.0-android.apk
           if-no-files-found: error
 
   docs:

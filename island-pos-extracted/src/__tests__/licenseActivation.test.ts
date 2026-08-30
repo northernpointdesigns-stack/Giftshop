@@ -52,38 +52,38 @@ describe('activateLicense provider chain', () => {
     vi.unstubAllEnvs();
   });
 
-  it('activates via LemonSqueezy when the LS check succeeds (Payhip never called)', async () => {
+    it('activates via Payhip when the Payhip check succeeds (LemonSqueezy never called)', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url.startsWith('https://api.lemonsqueezy.com')) {
-        return lsResponse({ valid: true });
+        throw new Error('LemonSqueezy should not be called');
       }
-      throw new Error('Payhip should not be called');
+      return payhipOk('buyer@example.com');
     }) as unknown as Mock;
     vi.stubGlobal('fetch', fetchMock);
 
     const res = await activateLicense('buyer@example.com', 'ABCDEFGHJKLMNPQRST');
-    expect(res).toEqual({ ok: true, source: 'lemonsqueezy' });
+    expect(res).toEqual({ ok: true, source: 'payhip' });
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(String(fetchMock.mock.calls[0][0])).toContain('lemonsqueezy');
+    expect(String(fetchMock.mock.calls[0][0])).toContain('payhip.com');
     expect(localStorage.getItem('pos_license_v1')).toBeTruthy();
   });
 
-  it('falls through to Payhip when LemonSqueezy rejects, and activates on enabled key', async () => {
+    it('falls back to LemonSqueezy when Payhip is unreachable, and activates on enabled key', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
-      if (url.startsWith('https://api.lemonsqueezy.com')) {
-        return lsResponse({ error: 'license_key not found.' }, 404);
-      }
       if (url.startsWith(PAYHIP_URL)) {
-        return payhipOk('buyer@example.com');
+        throw new Error('Payhip unreachable');
+      }
+      if (url.startsWith('https://api.lemonsqueezy.com')) {
+        return lsResponse({ valid: true });
       }
       throw new Error('Unexpected fetch: ' + url);
     }) as unknown as Mock;
     vi.stubGlobal('fetch', fetchMock);
 
     const res = await activateLicense('buyer@example.com', 'WTKP4-66NL5-HMKQW-GFSCZ');
-    expect(res).toEqual({ ok: true, source: 'payhip' });
+    expect(res).toEqual({ ok: true, source: 'lemonsqueezy' });
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(localStorage.getItem('pos_license_v1')).toBeTruthy();
   });
