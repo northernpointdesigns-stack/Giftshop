@@ -2,10 +2,11 @@ name: Build Gift Shop POS Releases
 # Build from the committed POS project root.
 
 on:
-  # Manual builds only — Actions minutes are only consumed when you click
-  # "Run workflow". Tag-triggered release builds are disabled to avoid
-  # automatic unsigned builds that fail on missing cert secrets.
+  # Manual builds, PLUS automatic builds+release publish when a v* tag is
+  # pushed (the tag's commit carries this workflow, so push-tag triggers work).
   workflow_dispatch:
+  push:
+    tags: ['v*']
 
 permissions:
   contents: write
@@ -16,10 +17,14 @@ env:
   # and variables → Actions → Variables) to strip the 14-day trial gate from
   # the built apps. Repos without the variable keep the customer trial flow.
   VITE_DISABLE_LICENSE: ${{ vars.VITE_DISABLE_LICENSE || '0' }}
-  # Customer storefront (Giftshop repo). Set Variables/Secrets:
+  # Customer storefront (Giftshop repo). Override via repo Variables/Secrets:
   #   VITE_PURCHASE_URL, VITE_PAYHIP_PRODUCT_SECRET
-  VITE_PURCHASE_URL: ${{ vars.VITE_PURCHASE_URL || secrets.VITE_PURCHASE_URL || '' }}
-  VITE_PAYHIP_PRODUCT_SECRET: ${{ secrets.VITE_PAYHIP_PRODUCT_SECRET || vars.VITE_PAYHIP_PRODUCT_SECRET || '' }}
+  # The inline fallbacks match the current live products. NOTE: Payhip product
+  # secret keys are designed to ship inside the public desktop app, so the
+  # fallback adds no new exposure. If you rotate keys in Payhip, update the
+  # repo secret VITE_PAYHIP_PRODUCT_SECRET (or these fallbacks) and rebuild.
+  VITE_PURCHASE_URL: ${{ vars.VITE_PURCHASE_URL || secrets.VITE_PURCHASE_URL || 'https://payhip.com/b/PHMGz' }}
+  VITE_PAYHIP_PRODUCT_SECRET: ${{ secrets.VITE_PAYHIP_PRODUCT_SECRET || vars.VITE_PAYHIP_PRODUCT_SECRET || 'prod_sk_PHMGz_35e00b7f646b2e4f54560e1b4ef02f4827c68f9d,prod_sk_hGY7k_abd0d25ad994fa4218947997e515eabcc4319742' }}
 
 jobs:
   docs:

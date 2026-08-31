@@ -3,17 +3,24 @@ name: Build Gift Shop POS Android APK
 # This workflow intentionally runs independently from desktop releases.
 
 on:
-  # Manual builds only — Actions minutes are only consumed when you click
-  # "Run workflow". Pushing to main no longer triggers anything.
+  # Manual builds, PLUS automatic APK builds when a v* tag is pushed.
   workflow_dispatch:
+  push:
+    tags: ['v*']
+
+# Needed to attach the APK to the GitHub release on tag builds.
+permissions:
+  contents: write
 
 # Unlock flag: set repo VARIABLE VITE_DISABLE_LICENSE=1 (Settings → Secrets
 # and variables → Actions → Variables) to strip the 14-day trial gate from
 # the built APK. Repos without the variable keep the customer trial flow.
 env:
   VITE_DISABLE_LICENSE: ${{ vars.VITE_DISABLE_LICENSE || '0' }}
-  VITE_PURCHASE_URL: ${{ vars.VITE_PURCHASE_URL || secrets.VITE_PURCHASE_URL || '' }}
-  VITE_PAYHIP_PRODUCT_SECRET: ${{ secrets.VITE_PAYHIP_PRODUCT_SECRET || vars.VITE_PAYHIP_PRODUCT_SECRET || '' }}
+  # Override via repo Variables/Secrets; inline fallbacks match the live
+  # Payhip products (product secret keys are designed to ship in the app).
+  VITE_PURCHASE_URL: ${{ vars.VITE_PURCHASE_URL || secrets.VITE_PURCHASE_URL || 'https://payhip.com/b/PHMGz' }}
+  VITE_PAYHIP_PRODUCT_SECRET: ${{ secrets.VITE_PAYHIP_PRODUCT_SECRET || vars.VITE_PAYHIP_PRODUCT_SECRET || 'prod_sk_PHMGz_35e00b7f646b2e4f54560e1b4ef02f4827c68f9d,prod_sk_hGY7k_abd0d25ad994fa4218947997e515eabcc4319742' }}
 
 jobs:
   build-apk:
@@ -74,6 +81,17 @@ jobs:
           name: gift-shop-pos-android-debug
           path: island-pos-extracted/android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
+      - name: Stage branded APK
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: cp island-pos-extracted/android/app/build/outputs/apk/debug/app-debug.apk "The.Gift.Shop.POS-1.0.0-android.apk"
+
+      - name: Attach APK to GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: The.Gift.Shop.POS-1.0.0-android.apk
 
   docs:
     name: Customer setup PDF
