@@ -261,15 +261,12 @@ jobs:
         with:
           path: release-assets
           merge-multiple: true
-          pattern: |
-            gift-shop-pos-win
-            gift-shop-pos-mac
-            gift-shop-pos-setup-guide
+          pattern: gift-shop-pos-*
 
       - name: Remove non-release files
         run: |
-          cd release-assets
-          rm -f Info.plist PkgInfo CodeResources Assets.car App Capacitor Cordova \
+          mkdir -p release-assets && cd release-assets
+          rm -rf Info.plist PkgInfo CodeResources Assets.car App Capacitor Cordova \
             config.xml capacitor.config.json manifest.json sw.js native-bridge.js \
             PrivacyInfo.xcprivacy version.json index.html index-*.js index-*.css \
             *.nib AppIcon*.png || true
