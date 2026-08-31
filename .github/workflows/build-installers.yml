@@ -185,75 +185,10 @@ jobs:
             island-pos-extracted/dist-desktop/*.zip
           if-no-files-found: error
 
-  ios-simulator:
-    name: iOS simulator build
-    runs-on: macos-14
-    defaults:
-      run:
-        working-directory: island-pos-extracted
-    steps:
-      - name: Check out source
-        uses: actions/checkout@v5
-
-      - name: Configure license mode
-        shell: bash
-        run: |
-          echo "VITE_DISABLE_LICENSE=$VITE_DISABLE_LICENSE" >> .env.production
-          if [ -n "$VITE_PURCHASE_URL" ]; then
-            echo "VITE_PURCHASE_URL=$VITE_PURCHASE_URL" >> .env.production
-          fi
-          if [ -n "$VITE_PAYHIP_PRODUCT_SECRET" ]; then
-            echo "VITE_PAYHIP_PRODUCT_SECRET=$VITE_PAYHIP_PRODUCT_SECRET" >> .env.production
-          fi
-          if [ "$VITE_DISABLE_LICENSE" = "1" ]; then
-            echo "UNLOCKED owner build - trial/activation gate disabled"
-          else
-            echo "Customer build - 14-day trial gate enabled"
-            echo "Purchase URL set: $([ -n \"$VITE_PURCHASE_URL\" ] && echo yes || echo no)"
-            echo "Payhip secret set: $([ -n \"$VITE_PAYHIP_PRODUCT_SECRET\" ] && echo yes || echo no)"
-          fi
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v5
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: island-pos-extracted/package-lock.json
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build web bundle
-        run: npm run build
-
-      - name: Generate and sync Capacitor iOS project
-        run: |
-          npx cap add ios
-          npx cap sync ios
-
-      - name: Build unsigned simulator app
-        run: >-
-          xcodebuild
-          -project ios/App/App.xcodeproj
-          -scheme App
-          -sdk iphonesimulator
-          -destination 'generic/platform=iOS Simulator'
-          -configuration Debug
-          -derivedDataPath ios/build
-          CODE_SIGNING_ALLOWED=NO
-          build
-
-      - name: Upload iOS simulator app
-        uses: actions/upload-artifact@v4
-        with:
-          name: gift-shop-pos-ios-simulator
-          path: island-pos-extracted/ios/build/Build/Products/Debug-iphonesimulator/App.app
-          if-no-files-found: error
-
   release:
     name: Publish GitHub release
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [desktop, docs, ios-simulator]
+    needs: [desktop, docs]
     runs-on: ubuntu-latest
     steps:
       - name: Download build artifacts
@@ -272,8 +207,26 @@ jobs:
             *.nib AppIcon*.png || true
           ls -la
 
+      - name: Purge existing release assets (clean slate, keep APK)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          RELEASE_ID=$(gh api "repos/${{ github.repository }}/releases/tags/${{ github.ref_name }}" --jq '.id' 2>/dev/null || true)
+          if [ -n "$RELEASE_ID" ]; then
+            echo "Purging assets from existing release $RELEASE_ID (APK excluded)"
+            gh api "repos/${{ github.repository }}/releases/$RELEASE_ID/assets" --paginate --jq '.[] | select(.name | endswith(".apk") | not) | .id' | while read -r ASSET_ID; do
+              gh api -X DELETE "repos/${{ github.repository }}/releases/assets/$ASSET_ID" || true
+            done
+          else
+            echo "No existing release for ${{ github.ref_name }} — clean publish"
+          fi
+
       - name: Publish release assets
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
-          files: release-assets/**/*
+          files: |
+            release-assets/*.exe
+            release-assets/*.dmg
+            release-assets/*.zip
+            release-assets/*.pdf
