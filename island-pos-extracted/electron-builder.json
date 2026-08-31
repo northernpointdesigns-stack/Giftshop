@@ -52,13 +52,6 @@
         "y": 190,
         "type": "link",
         "path": "/Applications"
-      },
-      {
-        "x": 330,
-        "y": 330,
-        "type": "file",
-        "name": "Install.command",
-        "path": "build/Install.command"
       }
     ]
   },

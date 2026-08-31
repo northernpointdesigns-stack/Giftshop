@@ -164,15 +164,15 @@ def build():
 
     story += [Paragraph("4. macOS (.dmg)", st["h1"]), HRFlowable(width="100%", thickness=1, color=BORDER, spaceAfter=6), Paragraph("4.1 Install", st["h2"])]
     story += bu(["Open the branded DMG → drag The Gift Shop POS onto the Applications shortcut → eject → open from Applications."], st["bu"])
-    story += [Paragraph("4.2 Unidentified developer", st["h2"])]
+    story += [Paragraph("4.2 Unidentified developer (first launch only)", st["h2"])]
     story += bu([
-        "System Settings → Privacy &amp; Security → Open Anyway (if blocked).",
-        "Or Control-click app → Open → Open (first time).",
-        "Easiest: double-click <b>Install.command</b> inside the DMG — it opens Terminal automatically, clears Gatekeeper, and launches the app.",
+        "The app is ad-hoc signed (not notarized), so macOS asks once. That is <b>normal</b> for trial builds.",
+        "Easiest: <b>right-click The Gift Shop POS</b> → <b>Open</b> → click <b>Open</b> again.",
+        "Or: System Settings → Privacy &amp; Security → Open Anyway.",
     ], st["bu"])
     story += [
         Paragraph("4.3 App is damaged / moved to Trash (unsigned quarantine)", st["h2"]),
-        Paragraph("Clear quarantine in Terminal, then open again (the app also clears it itself after the first successful launch):", st["b"]),
+        Paragraph("This affects unsigned downloads only. The app clears its own Gatekeeper flag on the first successful launch, so this is normally a one-time step. If it still shows damaged:", st["b"]),
         box('<font face="Courier">xattr -cr "/Applications/The Gift Shop POS.app"</font>', st["c"], BG, BORDER),
         Paragraph('If the name differs: type <font face="Courier">xattr -cr </font> then drag the app into Terminal. Then right-click → Open.', st["b"]),
         box("<b>Universal DMG:</b> the same DMG works on both Apple silicon (M1–M4) and Intel Macs.", st["b"], WARN_BG, WARN_BD),

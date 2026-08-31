@@ -3,7 +3,6 @@ node_modules/
 build/*
 !build/dmg-background.png
 !build/dmg-background@2x.png
-!build/Install.command
 !build/support/
 !build/support/**
 dist/

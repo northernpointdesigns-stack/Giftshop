@@ -143,7 +143,7 @@ def make(scale, out):
     _draw_icon_well(d, cx2, cy2, s, MUTED, (20, 26, 38))
     _draw_up_arrow(d, cx2, cy2, s)
 
-    cap_txt = "Double-click Install.command to clear Gatekeeper and launch"
+    cap_txt = "One DMG — works on Apple silicon & Intel Macs"
     d.text(((w - d.textlength(cap_txt, font=cap)) / 2, int(HELPER_CENTER[1] * s - 42 * s)), cap_txt, font=cap, fill=DIM)
 
     img.convert("RGB").save(out)

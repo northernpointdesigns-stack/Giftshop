@@ -56,10 +56,10 @@ You do **not** need LemonSqueezy-style multi-variant license APIs for a single l
 Covered in the PDF:
 
 - **Windows:** SmartScreen → More info → Run anyway
-- **Mac:** Open the branded DMG → drag **The Gift Shop POS** onto the **Applications** shortcut → eject.
-  - If Gatekeeper blocks the first launch, double-click **`Install.command`** inside the DMG — it opens Terminal automatically, runs `xattr -cr "/Applications/The Gift Shop POS.app"`, and launches the app.
-  - Manual fallback: Control-click the app → Open → Open.
-  - Once launched, the app clears its own quarantine flag, so later launches are plain double-clicks.
+- **Mac:** Open the branded DMG - right-click/drag **The Gift Shop POS** onto the **Applications** shortcut - eject.
+  - First launch (ad-hoc signed, not notarized): **right-click The Gift Shop POS → Open → Open**. One time only.
+  - The app clears its own quarantine flag on that first successful launch, so later launches are plain double-clicks - no Terminal needed, no helper script.
+  - If it still says "damaged": `xattr -cr "/Applications/The Gift Shop POS.app"`, then right-click - Open.
 - **Android:** allow unknown apps for APK install
 
 **Zero-terminal builds:** push a `vX.Y.Z` tag after adding the `MAC_CERTIFICATE_BASE64`, `MAC_CERTIFICATE_PASSWORD`, `MAC_KEYCHAIN_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID` secrets (see `RELEASE_SIGNING.md`). The signed + notarized DMG installs and opens with no Gatekeeper prompt at all.
