@@ -261,6 +261,19 @@ jobs:
         with:
           path: release-assets
           merge-multiple: true
+          pattern: |
+            gift-shop-pos-win
+            gift-shop-pos-mac
+            gift-shop-pos-setup-guide
+
+      - name: Remove non-release files
+        run: |
+          cd release-assets
+          rm -f Info.plist PkgInfo CodeResources Assets.car App Capacitor Cordova \
+            config.xml capacitor.config.json manifest.json sw.js native-bridge.js \
+            PrivacyInfo.xcprivacy version.json index.html index-*.js index-*.css \
+            *.nib AppIcon*.png || true
+          ls -la
 
       - name: Publish release assets
         uses: softprops/action-gh-release@v2
