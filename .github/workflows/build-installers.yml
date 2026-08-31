@@ -152,25 +152,14 @@ jobs:
           CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
         run: npx electron-builder --win nsis --publish never
 
-      - name: Build macOS installer
+      - name: Build macOS installer (unsigned / ad-hoc DMG)
         if: matrix.platform == 'mac' && env.RELEASE_BUILD == 'false'
-        run: npx electron-builder --mac dmg zip --arm64 --publish never
-
-      - name: Ad-hoc sign macOS app and repackage DMG
-        if: matrix.platform == 'mac' && env.RELEASE_BUILD == 'false'
-        run: |
-          set -e
-          APP_PATH=$(find dist-desktop -maxdepth 3 -name "*.app" -type d | head -1)
-          echo "Signing $APP_PATH"
-          codesign --deep --force --sign - --timestamp=none "$APP_PATH"
-          codesign --verify --verbose "$APP_PATH"
-          DMG_NAME=$(find dist-desktop -name "*.dmg" | head -1)
-          if [ -n "$DMG_NAME" ]; then rm -f "$DMG_NAME"; fi
-          hdiutil create -volname "The Gift Shop POS 1.0.0-arm64" -srcfolder "$APP_PATH" -ov -format UDZO "dist-desktop/The Gift Shop POS-1.0.0-arm64.dmg"
+        run: npx electron-builder --mac dmg zip --arm64 --publish never -c.mac.identity=-
 
       - name: Build signed macOS installer
         if: matrix.platform == 'mac' && env.RELEASE_BUILD == 'true'
         env:
+          CSC_LINK: data:application/x-pkcs12;base64,${{ secrets.MAC_CERTIFICATE_BASE64 }}
           CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}

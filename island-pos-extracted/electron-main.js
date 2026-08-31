@@ -1,6 +1,7 @@
 import { app, BrowserWindow, Menu, globalShortcut } from 'electron';
 import path from 'path';
 import fs from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -9,6 +10,55 @@ const __dirname = path.dirname(__filename);
 let mainWindow = null;
 let secondaryWindow = null;
 let uiCheckTimer = null;
+
+/** True only inside the packaged .app on macOS. */
+const isMacPackaged = process.platform === 'darwin' && app.isPackaged;
+
+/**
+ * Track A (unsigned builds): clear the macOS Gatekeeper quarantine flag from
+ * the app bundle on launch. Best-effort — startup never blocks on this.
+ */
+function clearQuarantine() {
+  if (!isMacPackaged) return;
+  try {
+    // process.execPath = ".../The Gift Shop POS.app/Contents/MacOS/The Gift Shop POS";
+    const bundle = path.resolve(process.execPath, '..', '..', '..');
+    spawnSync('xattr', ['-dr', 'com.apple.quarantine', bundle], { timeout: 15000 });
+  } catch {
+    // ignore — dev build / xattr unavailable
+  }
+}
+
+/**
+ * Track A (unsigned builds): copy versioned support files bundled inside the
+ * .app (Contents/Resources/support) into Application Support so clients never
+ * need to touch Terminal to install companion files. Files refresh whenever
+ * the app version changes; user data in userData/ is never deleted.
+ */
+const SUPPORT_VERSION_MARKER = '.support-version';
+
+function bootstrapSupportFiles() {
+  if (!app.isPackaged) return;
+  try {
+    const srcDir = path.join(process.resourcesPath, 'support');
+    if (!fs.existsSync(srcDir)) return;
+    const destDir = path.join(app.getPath('userData'), 'support');
+    const marker = path.join(app.getPath('userData'), SUPPORT_VERSION_MARKER);
+    let applied = '';
+    try {
+      applied = fs.readFileSync(marker, 'utf8');
+    } catch {
+      // first run
+    }
+    if (applied === app.getVersion()) return;
+    fs.rmSync(destDir, { recursive: true, force: true });
+    fs.mkdirSync(destDir, { recursive: true });
+    fs.cpSync(srcDir, destDir, { recursive: true });
+    fs.writeFileSync(marker, app.getVersion());
+  } catch {
+    // ignore — never block startup
+  }
+}
 
 function createWindows() {
   // Create primary cashier POS window
@@ -93,6 +143,9 @@ function createWindows() {
 }
 
 app.whenReady().then(() => {
+  clearQuarantine();
+  bootstrapSupportFiles();
+
   createWindows();
 
   // Standard keyboard shortcuts for POS operations

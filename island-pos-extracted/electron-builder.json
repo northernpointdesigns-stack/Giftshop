@@ -20,8 +20,45 @@
     ],
     "category": "public.app-category.business",
     "darkModeSupport": true,
-    "identity": "-"
+    "artifactName": "The Gift Shop POS-${version}-${arch}.${ext}"
   },
+  "dmg": {
+    "title": "The Gift Shop POS 1.0.0-arm64",
+    "background": "build/dmg-background.png",
+    "window": {
+      "width": 660,
+      "height": 400
+    },
+    "contents": [
+      {
+        "x": 180,
+        "y": 190,
+        "type": "file"
+      },
+      {
+        "x": 480,
+        "y": 190,
+        "type": "link",
+        "path": "/Applications"
+      },
+      {
+        "x": 330,
+        "y": 330,
+        "type": "file",
+        "name": "Install.command",
+        "path": "build/Install.command"
+      }
+    ]
+  },
+  "extraResources": [
+    {
+      "from": "build/support",
+      "to": "support",
+      "filter": [
+        "**/*"
+      ]
+    }
+  ],
   "win": {
     "target": [
       {

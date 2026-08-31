@@ -1,5 +1,11 @@
 node_modules/
-build/
+# DMG build resources: keep the repo-required assets, ignore the rest of build/
+build/*
+!build/dmg-background.png
+!build/dmg-background@2x.png
+!build/Install.command
+!build/support/
+!build/support/**
 dist/
 dist-desktop/
 coverage/

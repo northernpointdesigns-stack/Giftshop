@@ -163,15 +163,16 @@ def build():
     story.append(PageBreak())
 
     story += [Paragraph("4. macOS (.dmg)", st["h1"]), HRFlowable(width="100%", thickness=1, color=BORDER, spaceAfter=6), Paragraph("4.1 Install", st["h2"])]
-    story += bu(["Open DMG → drag app to Applications → eject → open from Applications."], st["bu"])
+    story += bu(["Open the branded DMG → drag The Gift Shop POS onto the Applications shortcut → eject → open from Applications."], st["bu"])
     story += [Paragraph("4.2 Unidentified developer", st["h2"])]
     story += bu([
         "System Settings → Privacy &amp; Security → Open Anyway (if blocked).",
         "Or Control-click app → Open → Open (first time).",
+        "Easiest: double-click <b>Install.command</b> inside the DMG — it opens Terminal automatically, clears Gatekeeper, and launches the app.",
     ], st["bu"])
     story += [
         Paragraph("4.3 App is damaged / moved to Trash (unsigned quarantine)", st["h2"]),
-        Paragraph("Clear quarantine in Terminal, then open again:", st["b"]),
+        Paragraph("Clear quarantine in Terminal, then open again (the app also clears it itself after the first successful launch):", st["b"]),
         box('<font face="Courier">xattr -cr "/Applications/The Gift Shop POS.app"</font>', st["c"], BG, BORDER),
         Paragraph('If the name differs: type <font face="Courier">xattr -cr </font> then drag the app into Terminal. Then right-click → Open.', st["b"]),
         box("<b>Apple silicon:</b> use the arm64 DMG on M1/M2/M3/M4 Macs.", st["b"], WARN_BG, WARN_BD),
