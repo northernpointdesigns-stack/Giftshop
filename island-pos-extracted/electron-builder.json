@@ -7,14 +7,26 @@
   "files": [
     "dist/**/*",
     "electron-main.js",
-    "package.json"
+    "package.json",
+    "!node_modules/@esbuild/**",
+    "!node_modules/@rollup/**",
+    "!node_modules/@tailwindcss/**",
+    "!node_modules/esbuild/**",
+    "!node_modules/rollup/**",
+    "!node_modules/tailwindcss/**",
+    "!node_modules/lightningcss*/**",
+    "!node_modules/fsevents/**",
+    "!node_modules/vite/**",
+    "!node_modules/@vitejs/**",
+    "!node_modules/concurrently/**",
+    "!node_modules/@tailwindcss/vite/**"
   ],
   "mac": {
     "target": [
       {
         "target": "dmg",
         "arch": [
-          "arm64"
+          "universal"
         ]
       }
     ],
@@ -23,7 +35,7 @@
     "artifactName": "The Gift Shop POS-${version}-${arch}.${ext}"
   },
   "dmg": {
-    "title": "The Gift Shop POS 1.0.0-arm64",
+    "title": "The Gift Shop POS 1.0.0",
     "background": "build/dmg-background.png",
     "window": {
       "width": 660,

@@ -152,11 +152,11 @@ jobs:
           CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
         run: npx electron-builder --win nsis --publish never
 
-      - name: Build macOS installer (unsigned / ad-hoc DMG)
+      - name: Build macOS installer (unsigned / universal DMG)
         if: matrix.platform == 'mac' && env.RELEASE_BUILD == 'false'
-        run: npx electron-builder --mac dmg zip --arm64 --publish never -c.mac.identity=-
+        run: npx electron-builder --mac dmg zip --universal --publish never -c.mac.identity=-
 
-      - name: Build signed macOS installer
+      - name: Build macOS installer (signed / universal DMG)
         if: matrix.platform == 'mac' && env.RELEASE_BUILD == 'true'
         env:
           CSC_LINK: data:application/x-pkcs12;base64,${{ secrets.MAC_CERTIFICATE_BASE64 }}
@@ -164,7 +164,7 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: npx electron-builder --mac dmg zip --arm64 --publish never
+        run: npx electron-builder --mac dmg zip --universal --publish never
 
       - name: Upload desktop installer
         uses: actions/upload-artifact@v4

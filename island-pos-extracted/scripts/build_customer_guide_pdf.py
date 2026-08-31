@@ -175,7 +175,7 @@ def build():
         Paragraph("Clear quarantine in Terminal, then open again (the app also clears it itself after the first successful launch):", st["b"]),
         box('<font face="Courier">xattr -cr "/Applications/The Gift Shop POS.app"</font>', st["c"], BG, BORDER),
         Paragraph('If the name differs: type <font face="Courier">xattr -cr </font> then drag the app into Terminal. Then right-click → Open.', st["b"]),
-        box("<b>Apple silicon:</b> use the arm64 DMG on M1/M2/M3/M4 Macs.", st["b"], WARN_BG, WARN_BD),
+        box("<b>Universal DMG:</b> the same DMG works on both Apple silicon (M1–M4) and Intel Macs.", st["b"], WARN_BG, WARN_BD),
         PageBreak(),
     ]
 
