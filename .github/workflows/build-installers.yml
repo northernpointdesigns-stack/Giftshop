@@ -114,8 +114,10 @@ jobs:
           WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
         shell: bash
         run: |
-          test -n "$WINDOWS_CERTIFICATE_BASE64" || { echo 'Missing WINDOWS_CERTIFICATE_BASE64'; exit 1; }
-          test -n "$WINDOWS_CERTIFICATE_PASSWORD" || { echo 'Missing WINDOWS_CERTIFICATE_PASSWORD'; exit 1; }
+          if [ -z "$WINDOWS_CERTIFICATE_BASE64" ] || [ -z "$WINDOWS_CERTIFICATE_PASSWORD" ]; then
+            echo '::warning::Windows signing secrets not configured — building UNSIGNED installer (SmartScreen will warn users). Set WINDOWS_CERTIFICATE_BASE64 / WINDOWS_CERTIFICATE_PASSWORD to sign.'
+            exit 0
+          fi
 
       - name: Prepare macOS signing and notarization
         if: matrix.platform == 'mac' && env.RELEASE_BUILD == 'true'
@@ -128,12 +130,10 @@ jobs:
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
-          test -n "$MAC_CERTIFICATE_BASE64" || { echo 'Missing MAC_CERTIFICATE_BASE64'; exit 1; }
-          test -n "$MAC_CERTIFICATE_PASSWORD" || { echo 'Missing MAC_CERTIFICATE_PASSWORD'; exit 1; }
-          test -n "$KEYCHAIN_PASSWORD" || { echo 'Missing MAC_KEYCHAIN_PASSWORD'; exit 1; }
-          test -n "$APPLE_ID" || { echo 'Missing APPLE_ID'; exit 1; }
-          test -n "$APPLE_APP_SPECIFIC_PASSWORD" || { echo 'Missing APPLE_APP_SPECIFIC_PASSWORD'; exit 1; }
-          test -n "$APPLE_TEAM_ID" || { echo 'Missing APPLE_TEAM_ID'; exit 1; }
+          if [ -z "$MAC_CERTIFICATE_BASE64" ] || [ -z "$MAC_CERTIFICATE_PASSWORD" ] || [ -z "$KEYCHAIN_PASSWORD" ] || [ -z "$APPLE_ID" ] || [ -z "$APPLE_APP_SPECIFIC_PASSWORD" ] || [ -z "$APPLE_TEAM_ID" ]; then
+            echo '::warning::macOS signing/notarization secrets not configured — building UNSIGNED app (Gatekeeper right-click > Open). Set the MAC_CERTIFICATE_* / APPLE_* secrets to sign and notarize.'
+            exit 0
+          fi
           CERT_PATH="$RUNNER_TEMP/macos-signing.p12"
           KEYCHAIN_PATH="$RUNNER_TEMP/build.keychain-db"
           printf '%s' "$MAC_CERTIFICATE_BASE64" | base64 --decode > "$CERT_PATH"
