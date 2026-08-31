@@ -66,16 +66,26 @@ export const SUPPORT_EMAIL = 'support@your-store.example.com';
  *
  * Enable at build time (leave unset to skip the Payhip path entirely):
  *   VITE_PAYHIP_PRODUCT_SECRET=your-product-secret-key
+ * Multiple products (e.g. a $19.99 lifetime desktop product AND a $9.99
+ * Android product) can be verified by the same build — supply a
+ * comma-separated list and every product secret is tried in turn:
+ *   VITE_PAYHIP_PRODUCT_SECRET=prod_sk_AAA...,prod_sk_BBB...
  */
-function readPayhipProductSecret(): string {
+function readPayhipProductSecrets(): string[] {
   try {
     // Static member expression so Vite replaces it at build time.
     const v = import.meta.env.VITE_PAYHIP_PRODUCT_SECRET;
-    if (v) return String(v).trim();
+    if (v) {
+      return String(v)
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+    }
   } catch {}
-  return '';
+  return [];
 }
-export const PAYHIP_PRODUCT_SECRET = readPayhipProductSecret();
+const PAYHIP_PRODUCT_SECRETS = readPayhipProductSecrets();
+export const PAYHIP_PRODUCT_SECRET = PAYHIP_PRODUCT_SECRETS[0] || '';
 export const PAYHIP_LICENSE_VERIFY_API = 'https://payhip.com/api/v2/license/verify';
 // LemonSqueezy public License API is kept only as a legacy fallback for older
 // DMG buyers. Payhip is the primary activation path (see activateLicense).
@@ -358,66 +368,71 @@ export async function verifyLicensePayhip(
   key: string,
   signal?: AbortSignal,
 ): Promise<{ ok: boolean; error?: string }> {
-  if (!PAYHIP_PRODUCT_SECRET) {
+  if (PAYHIP_PRODUCT_SECRETS.length === 0) {
     // Build without a Payhip product secret: this provider is simply unused.
     return { ok: false, error: 'Payhip verification is not configured in this build.' };
   }
-  try {
-    const url = `${PAYHIP_LICENSE_VERIFY_API}?license_key=${encodeURIComponent(key.trim())}`;
-    const res = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'product-secret-key': PAYHIP_PRODUCT_SECRET,
-        Accept: 'application/json',
-      },
-      signal,
-    });
-    let payload: { data?: { enabled?: boolean; buyer_email?: string } | null; error?: boolean } | null = null;
+  // Try every configured product secret in turn — the first one that
+  // recognises the license key wins. This lets one build verify keys from
+  // multiple Payhip products (e.g. desktop lifetime + Android license).
+  let lastError = 'Payhip could not verify this key right now. Please try again in a moment.';
+  for (const productSecret of PAYHIP_PRODUCT_SECRETS) {
     try {
-      payload = await res.json();
-    } catch {
-      /* non-JSON body — handled below */
+      const url = `${PAYHIP_LICENSE_VERIFY_API}?license_key=${encodeURIComponent(key.trim())}`;
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'product-secret-key': productSecret,
+          Accept: 'application/json',
+        },
+        signal,
+      });
+      let payload: { data?: { enabled?: boolean; buyer_email?: string } | null; error?: boolean } | null = null;
+      try {
+        payload = await res.json();
+      } catch {
+        /* non-JSON body — handled below */
+      }
+      const data = payload?.data;
+      // Payhip returns HTTP 200 + `{ data: { enabled, buyer_email, ... } }` for a
+      // valid key, and HTTP 400/404 + `{ data: [], error: true }` for a bad one.
+      const notFound =
+        res.status === 400 ||
+        res.status === 404 ||
+        payload?.error === true ||
+        (Array.isArray(data) && data.length === 0);
+      if (!res.ok || !data || notFound) {
+        if (notFound) {
+          // Not recognised by THIS product — try the next product secret.
+          lastError = 'License key not found. Check the key in your Payhip receipt email.';
+          continue;
+        }
+        lastError = 'Payhip could not verify this key right now. Please try again in a moment.';
+        continue;
+      }
+      if (!data.enabled) {
+        return {
+          ok: false,
+          error: 'This license key has been disabled. Please contact support.',
+        };
+      }
+      if (
+        data.buyer_email &&
+        data.buyer_email.trim().toLowerCase() !== email.trim().toLowerCase()
+      ) {
+        return {
+          ok: false,
+          error:
+            'This key was issued to a different email address. Use the exact email from your Payhip receipt.',
+        };
+      }
+      return { ok: true };
+    } catch (err: any) {
+      if (err?.name === 'AbortError') throw err;
+      lastError = 'Could not reach Payhip. Check your internet connection and try again.';
     }
-    const data = payload?.data;
-    // Payhip returns HTTP 200 + `{ data: { enabled, buyer_email, ... } }` for a
-    // valid key, and HTTP 400/404 + `{ data: [], error: true }` for a bad one.
-    const notFound =
-      res.status === 400 ||
-      res.status === 404 ||
-      payload?.error === true ||
-      (Array.isArray(data) && data.length === 0);
-    if (!res.ok || !data || notFound) {
-      return {
-        ok: false,
-        error: notFound
-          ? 'License key not found. Check the key in your Payhip receipt email.'
-          : 'Payhip could not verify this key right now. Please try again in a moment.',
-      };
-    }
-    if (!data.enabled) {
-      return {
-        ok: false,
-        error: 'This license key has been disabled. Please contact support.',
-      };
-    }
-    if (
-      data.buyer_email &&
-      data.buyer_email.trim().toLowerCase() !== email.trim().toLowerCase()
-    ) {
-      return {
-        ok: false,
-        error:
-          'This key was issued to a different email address. Use the exact email from your Payhip receipt.',
-      };
-    }
-    return { ok: true };
-  } catch (err: any) {
-    if (err?.name === 'AbortError') throw err;
-    return {
-      ok: false,
-      error: 'Could not reach Payhip. Check your internet connection and try again.',
-    };
   }
+  return { ok: false, error: lastError };
 }
 
 /**
