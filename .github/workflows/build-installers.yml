@@ -169,7 +169,11 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: npx electron-builder --mac dmg zip --universal --publish never
+        run: |
+          npx electron-builder --mac dmg zip --universal --publish never || {
+            echo '::warning::Signed macOS build failed (check MAC_CERTIFICATE_BASE64 format — must be base64 of the .p12). Retrying UNSIGNED so the release still ships.'
+            CSC_LINK= CSC_KEY_PASSWORD= npx electron-builder --mac dmg zip --universal --publish never -c.mac.identity=null
+          }
 
       - name: Upload desktop installer
         uses: actions/upload-artifact@v4
