@@ -84,7 +84,7 @@ jobs:
 
       - name: Stage branded APK
         if: startsWith(github.ref, 'refs/tags/v')
-        run: cp island-pos-extracted/android/app/build/outputs/apk/debug/app-debug.apk "The.Gift.Shop.POS-1.0.0-android.apk"
+        run: cp "$GITHUB_WORKSPACE/island-pos-extracted/android/app/build/outputs/apk/debug/app-debug.apk" "$GITHUB_WORKSPACE/The.Gift.Shop.POS-1.0.0-android.apk"
 
       - name: Attach APK to GitHub release
         if: startsWith(github.ref, 'refs/tags/v')
