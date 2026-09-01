@@ -37,17 +37,9 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v5
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install reportlab
-        run: pip install reportlab
-
-      - name: Generate customer setup guide PDF
-        run: python3 scripts/build_customer_guide_pdf.py
-
+      # The full 22-page guide is committed at docs/ and is the source of
+      # truth — do NOT regenerate it with scripts/build_customer_guide_pdf.py,
+      # which produces a much thinner 16-page setup sheet.
       - name: Upload setup guide PDF
         uses: actions/upload-artifact@v4
         with:
