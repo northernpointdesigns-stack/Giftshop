@@ -157,11 +157,13 @@ jobs:
           CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
         run: npx electron-builder --win nsis --publish never
 
-      - name: Build macOS installer (unsigned / universal DMG)
+      - name: Build macOS installer (unsigned / universal + Apple Silicon DMGs)
         if: matrix.platform == 'mac' && env.RELEASE_BUILD == 'false'
-        run: npx electron-builder --mac dmg zip --universal --publish never -c.mac.identity=-
+        run: |
+          npx electron-builder --mac dmg zip --universal --publish never -c.mac.identity=-
+          npx electron-builder --mac dmg --arm64 --publish never -c.mac.identity=-
 
-      - name: Build macOS installer (signed / universal DMG)
+      - name: Build macOS installer (signed / universal + Apple Silicon DMGs)
         if: matrix.platform == 'mac' && env.RELEASE_BUILD == 'true'
         env:
           CSC_LINK: data:application/x-pkcs12;base64,${{ secrets.MAC_CERTIFICATE_BASE64 }}
@@ -170,10 +172,15 @@ jobs:
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
-          npx electron-builder --mac dmg zip --universal --publish never || {
+          SIGNED=true
+          npx electron-builder --mac dmg zip --universal --publish never || SIGNED=false
+          npx electron-builder --mac dmg --arm64 --publish never || SIGNED=false
+          if [ "$SIGNED" != "true" ]; then
             echo '::warning::Signed macOS build failed (check MAC_CERTIFICATE_BASE64 format — must be base64 of the .p12). Retrying UNSIGNED so the release still ships.'
+            rm -f island-pos-extracted/dist-desktop/*.dmg island-pos-extracted/dist-desktop/*.zip
             CSC_LINK= CSC_KEY_PASSWORD= npx electron-builder --mac dmg zip --universal --publish never -c.mac.identity=null
-          }
+            CSC_LINK= CSC_KEY_PASSWORD= npx electron-builder --mac dmg --arm64 --publish never -c.mac.identity=null
+          fi
 
       - name: Upload desktop installer
         uses: actions/upload-artifact@v4
